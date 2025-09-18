@@ -21,6 +21,7 @@ npm run preview
 ```
 
 ## Cấu trúc chính
+
 - `src/styles/theme.js`: chủ đề MUI (màu sắc, typography)
 - `src/layouts/MainLayout.jsx`: Navbar + Sidebar + vùng nội dung
 - `src/features/auth/pages/*`: Trang Home, Login, Register mẫu
