@@ -50,11 +50,11 @@ const Dashboard = () => {
 
   // Calculate real stats from lessons data
   const totalLessons = lessonsData.length;
-  const totalStudents = lessonsData.reduce((sum, lesson) => sum + lesson.students, 0);
-  const completedLessons = lessonsData.filter(lesson => lesson.progress === 100).length;
+  const totalVideoMinutes = lessonsData.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
+  const totalQuizzes = lessonsData.reduce((sum, lesson) => sum + (lesson.quizQuestions ? lesson.quizQuestions.length : 5), 0);
   const averageRating = Math.round(lessonsData.reduce((sum, lesson) => sum + lesson.rating, 0) / lessonsData.length * 10) / 10;
 
-  const finalStats = [totalLessons, totalStudents, completedLessons, averageRating * 10];
+  const finalStats = [totalLessons, totalVideoMinutes, totalQuizzes, averageRating * 10];
 
   useEffect(() => {
     setIsVisible(true);
@@ -98,25 +98,25 @@ const Dashboard = () => {
       gradient: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)'
     },
     {
-      title: 'Học sinh tham gia',
-      value: animatedStats[1].toLocaleString(),
-      icon: PeopleIcon,
+      title: 'Phút video học',
+      value: `${animatedStats[1]} phút`,
+      icon: TimeIcon,
       color: '#388e3c',
       bgColor: '#e8f5e8',
       gradient: 'linear-gradient(135deg, #388e3c 0%, #66bb6a 100%)'
     },
     {
-      title: 'Bài kiểm tra',
-      value: animatedStats[2],
+      title: 'Câu hỏi Quiz',
+      value: `${animatedStats[2]} câu`,
       icon: QuizIcon,
       color: '#f57c00',
       bgColor: '#fff3e0',
       gradient: 'linear-gradient(135deg, #f57c00 0%, #ffb74d 100%)'
     },
     {
-      title: 'Tỷ lệ hoàn thành',
-      value: `${animatedStats[3]}%`,
-      icon: TrendingUpIcon,
+      title: 'Đánh giá trung bình',
+      value: `${(animatedStats[3]/10).toFixed(1)}/5⭐`,
+      icon: StarIcon,
       color: '#7b1fa2',
       bgColor: '#f3e5f5',
       gradient: 'linear-gradient(135deg, #7b1fa2 0%, #ba68c8 100%)'

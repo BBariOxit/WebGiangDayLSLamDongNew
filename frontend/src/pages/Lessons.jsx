@@ -361,7 +361,8 @@ const Lessons = () => {
                       flexDirection: 'column',
                       cursor: isLocked ? 'not-allowed' : 'pointer',
                       position: 'relative',
-                      borderRadius: 3,
+                      // Use a fixed, smaller radius for a cleaner look (was 3 -> 3 * theme.shape.borderRadius)
+                      borderRadius: '12px',
                       overflow: 'hidden',
                       transition: 'all 0.3s ease',
                       opacity: isLocked ? 0.7 : 1,

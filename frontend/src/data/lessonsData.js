@@ -15,6 +15,28 @@ export const lessonsData = [
     category: 'Lịch sử địa phương',
     tags: ['Lịch sử', 'Sát nhập', 'Lâm Đồng mới', 'Hành chính'],
     status: 'Chưa học',
+    images: [
+      {
+        url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800',
+        caption: 'Thành phố Đà Lạt - Trung tâm hành chính chính của tỉnh Lâm Đồng mới',
+        description: 'Khung cảnh thơ mộng của Đà Lạt với những ngôi nhà kiến trúc Pháp cổ'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1570191913384-b1dfe9e9b4e0?w=800',
+        caption: 'Phan Thiết - Trung tâm phụ vùng duyên hải Nam Trung Bộ',
+        description: 'Bãi biển Phan Thiết với những thúng chai truyền thống của ngư dân'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+        caption: 'Gia Nghĩa - Trung tâm phụ vùng Tây Nguyên Đông',
+        description: 'Thác Dray Nur ở Đắk Nông - một trong những thác nước đẹp nhất Tây Nguyên'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800',
+        caption: 'Bản đồ hành chính tỉnh Lâm Đồng mới sau sát nhập',
+        description: 'Sơ đồ thể hiện 3 vùng địa lý đặc trưng của tỉnh Lâm Đồng mới'
+      }
+    ],
     contentHtml: `
       <div class="lesson-content">
         <h1>Lịch sử hình thành tỉnh Lâm Đồng mới (2025)</h1>
@@ -160,6 +182,28 @@ export const lessonsData = [
     category: 'Địa lý',
     tags: ['Địa lý', 'Khí hậu', 'Sinh thái', 'Đa dạng'],
     status: 'Chưa học',
+    images: [
+      {
+        url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
+        caption: 'Cao nguyên Đà Lạt với đồi chè xanh mướt',
+        description: 'Những đồi chè trập trùng tạo nên khung cảnh thơ mộng của cao nguyên Lâm Đồng'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1559827260-dc66f52bef19?w=800',
+        caption: 'Đồi cát bay Mũi Né - Phan Thiết',
+        description: 'Cảnh quan sa mạc độc đáo giữa vùng duyên hải Nam Trung Bộ'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800',
+        caption: 'Rừng nguyên sinh Đắk Nông',
+        description: 'Hệ sinh thái rừng nhiệt đới với thảm thực vật phong phú'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=800',
+        caption: 'Khí hậu ôn đới Đà Lạt quanh năm',
+        description: 'Sương mù bao phủ thành phố Đà Lạt tạo nên khí hậu mát mẻ đặc trưng'
+      }
+    ],
     contentHtml: `
       <div class="lesson-content">
         <h1>Địa lý và khí hậu đa dạng của Lâm Đồng mới</h1>
@@ -429,6 +473,28 @@ export const lessonsData = [
     category: 'Văn hóa',
     tags: ['Văn hóa', 'Dân tộc', 'Truyền thống', 'Đa dạng'],
     status: 'Chưa học',
+    images: [
+      {
+        url: 'https://images.unsplash.com/photo-1585647347483-22b66260dfff?w=800',
+        caption: 'Tháp Chăm Po Shanu - Di sản văn hóa Chăm ở Phan Thiết',
+        description: 'Kiến trúc tháp Chăm cổ kính mang đậm dấu ấn văn hóa Hindu-Chăm'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800',
+        caption: 'Trang phục truyền thống của dân tộc K\'Ho',
+        description: 'Những bộ trang phục thổ cẩm đặc sắc của đồng bào K\'Ho ở cao nguyên Lâm Đồng'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?w=800',
+        caption: 'Làng gốm Bàu Trúc - Nghề thủ công truyền thống Chăm',
+        description: 'Nghề làm gốm độc đáo của người Chăm được truyền từ đời này sang đời khác'
+      },
+      {
+        url: 'https://images.unsplash.com/photo-1559827260-dc66f52bef19?w=800',
+        caption: 'Lễ hội Kate - Lễ hội truyền thống của người Chăm',
+        description: 'Lễ hội Kate là dịp quan trọng nhất trong năm của cộng đồng người Chăm'
+      }
+    ],
     contentHtml: `
       <div class="lesson-content">
         <h1>Văn hóa đa sắc tộc trong Lâm Đồng mới</h1>

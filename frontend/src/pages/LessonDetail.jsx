@@ -476,6 +476,81 @@ const LessonDetail = () => {
           />
         </Paper>
 
+        {/* Image Gallery */}
+        {lesson.images && lesson.images.length > 0 && (
+          <Paper elevation={2} sx={{ p: 4, borderRadius: 3, mt: 4 }}>
+            <Typography variant="h4" component="h2" gutterBottom sx={{ 
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #1976d2, #2196f3)',
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              mb: 3
+            }}>
+              📸 Thư viện hình ảnh
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {lesson.images.map((image, index) => (
+                <Grid item xs={12} md={6} key={index}>
+                  <Card 
+                    sx={{ 
+                      height: '100%',
+                      borderRadius: 3,
+                      overflow: 'hidden',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: '0 12px 24px rgba(0,0,0,0.15)'
+                      }
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        height: 250,
+                        backgroundImage: `url(${image.url})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        position: 'relative',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '50%',
+                          background: 'linear-gradient(transparent, rgba(0,0,0,0.7))'
+                        }
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 16,
+                          left: 16,
+                          right: 16,
+                          color: 'white',
+                          zIndex: 2
+                        }}
+                      >
+                        <Typography variant="h6" fontWeight="bold" gutterBottom>
+                          {image.caption}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    <CardContent sx={{ p: 3 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                        {image.description}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
+        )}
+
         {/* Navigation to Next Lesson */}
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Button

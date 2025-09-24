@@ -104,26 +104,33 @@ const Home = () => {
                       startIcon={<Login />}
                       onClick={() => navigate('/login')}
                       sx={{
-                        bgcolor: 'white',
-                        color: '#667eea',
+                        background: 'linear-gradient(135deg, #2196f3, #21cbf3)',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)',
                         '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.9)'
+                          background: 'linear-gradient(135deg, #1976d2, #2196f3)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)'
                         }
                       }}
                     >
                       Đăng nhập
                     </Button>
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       size="large"
                       startIcon={<PersonAdd />}
                       onClick={() => navigate('/register')}
                       sx={{
-                        borderColor: 'white',
+                        background: 'linear-gradient(135deg, #9c27b0, #ba68c8)',
                         color: 'white',
+                        fontWeight: 'bold',
+                        boxShadow: '0 4px 15px rgba(156, 39, 176, 0.3)',
                         '&:hover': {
-                          bgcolor: 'rgba(255,255,255,0.1)',
-                          borderColor: 'white'
+                          background: 'linear-gradient(135deg, #7b1fa2, #9c27b0)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 6px 20px rgba(156, 39, 176, 0.4)'
                         }
                       }}
                     >
