@@ -27,6 +27,18 @@ Server mặc định chạy: `http://localhost:4000`
 | POST   | /api/auth/logout   | { refreshToken }                 | Thu hồi refresh token         |
 | GET    | /health            | -                                | Kiểm tra sống                 |
 
+## Endpoint Lessons
+
+| Method | Path             | Body / Query                                     | Auth                   | Mô tả                      |
+| ------ | ---------------- | ------------------------------------------------ | ---------------------- | -------------------------- |
+| GET    | /api/lessons     | ?q=&published=1                                  | Public                 | Danh sách bài học (filter) |
+| GET    | /api/lessons/:id | -                                                | Public                 | Xem chi tiết bài học       |
+| POST   | /api/lessons     | { title, summary?, contentHtml?, isPublished? }  | Bearer (Teacher/Admin) | Tạo mới                    |
+| PUT    | /api/lessons/:id | { title?, summary?, contentHtml?, isPublished? } | Bearer (Owner/Admin)   | Cập nhật                   |
+| DELETE | /api/lessons/:id | -                                                | Bearer (Owner/Admin)   | Xoá                        |
+
+Bearer token truyền qua header: `Authorization: Bearer <accessToken>`
+
 ## Ghi chú Bảo mật
 
 - Lưu mật khẩu: bcrypt (salt rounds từ env)
@@ -35,7 +47,7 @@ Server mặc định chạy: `http://localhost:4000`
 
 ## Roadmap tiếp
 
-- Thêm middleware kiểm tra JWT (access token) cho các module khác.
+- Thêm middleware kiểm tra JWT (access token) cho các module khác. (ĐÃ thêm: `verifyAccess`)
 - Thêm endpoint xác minh email / quên mật khẩu (dùng bảng VerificationTokens).
 - Thêm audit log (ghi bảng ActivityLogs).
 - Tách cấu hình logger & error codes chuẩn hoá.

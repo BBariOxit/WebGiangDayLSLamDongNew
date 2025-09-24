@@ -1,15 +1,18 @@
 // features/auth/pages/Login.jsx
 import React from 'react';
-import { Avatar, Box, Button, Card, CardContent, Container, Link, Stack, TextField, Typography } from '@mui/material';
+import { Avatar, Box, Button, Card, CardContent, Container, Link, Stack, TextField, Typography, Alert } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { Link as RouterLink } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginThunk } from '../authThunks';
 
 const Login = () => {
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector(s => s.auth);
   const handleSubmit = (e) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    // TODO: call API
-    console.log('login', Object.fromEntries(data.entries()));
+    dispatch(loginThunk({ email: data.get('email'), password: data.get('password') }));
   };
 
   return (
@@ -28,8 +31,9 @@ const Login = () => {
             <Stack spacing={2}>
               <TextField label="Email" name="email" type="email" required fullWidth />
               <TextField label="Mật khẩu" name="password" type="password" required fullWidth />
-              <Button type="submit" fullWidth variant="contained" size="large">
-                Đăng nhập
+              {error && <Alert severity="error" variant="outlined">{error}</Alert>}
+              <Button type="submit" fullWidth variant="contained" size="large" disabled={loading}>
+                {loading ? 'Đang xử lý...' : 'Đăng nhập'}
               </Button>
             </Stack>
           </Box>

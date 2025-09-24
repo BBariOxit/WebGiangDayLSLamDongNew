@@ -87,12 +87,16 @@ export async function refreshSession({ token }) {
   const stored = await findRefreshToken(token);
   if (!stored || stored.RevokedAt) throw new Error('Invalid refresh token');
   if (new Date(stored.ExpiresAt) < new Date()) throw new Error('Refresh token expired');
-  const payload = verifyRefreshToken(token);
-  const userId = payload.sub;
-  const user = { UserId: userId, Email: stored.Email, FullName: stored.FullName }; // minimal; optionally refetch user
-  // rotate token: revoke old, issue new
+  const payload = verifyRefreshToken(token); // ensure signature
+  if (payload.sub !== stored.UserId) throw new Error('Token user mismatch');
   await revokeRefreshToken(token, 'rotated');
-  return buildAuthResponse({ UserId: userId, Email: stored.Email, FullName: stored.FullName, RoleId: payload.roleId || 0, Status: 'Active' });
+  return buildAuthResponse({
+    UserId: stored.UserId,
+    Email: stored.Email,
+    FullName: stored.FullName,
+    RoleId: stored.RoleId,
+    Status: stored.Status
+  });
 }
 
 export async function logout({ refreshToken }) {

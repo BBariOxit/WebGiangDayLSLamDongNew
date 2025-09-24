@@ -1,14 +1,29 @@
 // features/auth/pages/Register.jsx
-import React from 'react';
-import { Avatar, Box, Button, Card, CardContent, Container, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import React, { useState } from 'react';
+import { Avatar, Box, Button, Card, CardContent, Container, MenuItem, Stack, TextField, Typography, Alert } from '@mui/material';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
+import { useDispatch, useSelector } from 'react-redux';
+import { registerThunk } from '../authThunks';
 
 const Register = () => {
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector(s => s.auth);
+  const [confirmError, setConfirmError] = useState(null);
   const handleSubmit = (e) => {
     e.preventDefault();
+    setConfirmError(null);
     const data = new FormData(e.currentTarget);
-    // TODO: call API
-    console.log('register', Object.fromEntries(data.entries()));
+    const password = data.get('password');
+    if (password !== data.get('confirm')) {
+      setConfirmError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+    dispatch(registerThunk({
+      name: data.get('name'),
+      email: data.get('email'),
+      password,
+      role: data.get('role')
+    }));
   };
 
   return (
@@ -37,8 +52,10 @@ const Register = () => {
                 <MenuItem value="student">Học viên</MenuItem>
                 <MenuItem value="teacher">Giáo viên</MenuItem>
               </TextField>
-              <Button type="submit" variant="contained" size="large">
-                Đăng ký
+              {confirmError && <Alert severity="warning">{confirmError}</Alert>}
+              {error && <Alert severity="error" variant="outlined">{error}</Alert>}
+              <Button type="submit" variant="contained" size="large" disabled={loading}>
+                {loading ? 'Đang xử lý...' : 'Đăng ký'}
               </Button>
             </Stack>
           </Box>

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import 'dotenv/config';
 import authRoutes from './modules/auth/routes/authRoutes.js';
+import lessonRoutes from './modules/lessons/routes/lessonRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
@@ -12,6 +13,7 @@ app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
+app.use('/api/lessons', lessonRoutes);
 app.use(errorHandler);
 
 export default app;

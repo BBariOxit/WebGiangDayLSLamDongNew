@@ -79,6 +79,9 @@ export async function revokeRefreshToken(token, reason, ip) {
 export async function findRefreshToken(token) {
   const pool = await getPool();
   const r = await pool.request().input('Token', sql.VarChar(255), token)
-    .query('SELECT * FROM RefreshTokens WHERE Token=@Token');
-  return r.recordset[0];
+    .query(`SELECT rt.*, u.Email, u.FullName, u.RoleId, u.Status
+            FROM RefreshTokens rt
+            INNER JOIN Users u ON u.UserId = rt.UserId
+            WHERE rt.Token=@Token`);
+  return r.recordset[0] || null;
 }

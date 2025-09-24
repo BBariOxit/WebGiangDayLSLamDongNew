@@ -11,19 +11,28 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Roles WHERE RoleCode='Student')
 INSERT INTO dbo.Roles(RoleId, RoleCode, RoleName) VALUES (3,'Student',N'Học viên');
 SET IDENTITY_INSERT dbo.Roles OFF;
 
-/* Admin User (password hash placeholder - store proper hash later) */
+/* Sample Users (password hash placeholder 0x00 -> replace by script set-dev-passwords) */
 IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email='admin@history.local')
-BEGIN
   INSERT INTO dbo.Users(Email, PasswordHash, FullName, RoleId, Status, IsEmailVerified)
   VALUES ('admin@history.local', 0x00, N'Quản trị hệ thống', 1, 'Active', 1);
-END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email='teacher.local@test.com')
+  INSERT INTO dbo.Users(Email, PasswordHash, FullName, RoleId, Status, IsEmailVerified)
+  VALUES ('teacher.local@test.com', 0x00, N'Giáo viên Local', 2, 'Active', 1);
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE Email='student.local@test.com')
+  INSERT INTO dbo.Users(Email, PasswordHash, FullName, RoleId, Status, IsEmailVerified)
+  VALUES ('student.local@test.com', 0x00, N'Học viên Local', 3, 'Active', 1);
 
 /* Example Lessons */
 IF NOT EXISTS (SELECT 1 FROM dbo.Lessons)
 BEGIN
-  INSERT INTO dbo.Lessons(Title, Slug, ContentHtml, CreatedBy, IsPublished)
-  SELECT N'Lâm Đồng thời kỳ hình thành', 'lam-dong-lich-su-hinh-thanh', N'<h2>Lịch sử hình thành</h2><p>Nội dung giới thiệu...</p>', u.UserId, 1
+  INSERT INTO dbo.Lessons(Title, Slug, Summary, ContentHtml, CreatedBy, IsPublished)
+  SELECT N'Lâm Đồng thời kỳ hình thành', 'lam-dong-lich-su-hinh-thanh', N'Giới thiệu giai đoạn hình thành', N'<h2>Lịch sử hình thành</h2><p>Nội dung giới thiệu...</p>', u.UserId, 1
   FROM dbo.Users u WHERE u.Email='admin@history.local';
+  INSERT INTO dbo.Lessons(Title, Slug, Summary, ContentHtml, CreatedBy, IsPublished)
+  SELECT N'Địa lý và khí hậu', 'dia-ly-khi-hau', N'Khái quát địa lý, khí hậu Lâm Đồng', N'<p>Địa lý, khí hậu ảnh hưởng lịch sử...</p>', u.UserId, 1
+  FROM dbo.Users u WHERE u.Email='teacher.local@test.com';
 END;
 
 /* Example Quiz + Questions */
@@ -51,13 +60,24 @@ IF NOT EXISTS (SELECT 1 FROM dbo.AuthProviders WHERE ProviderCode='local')
 IF NOT EXISTS (SELECT 1 FROM dbo.AuthProviders WHERE ProviderCode='google')
   INSERT INTO dbo.AuthProviders(ProviderCode, ProviderName, IsOAuth) VALUES ('google', N'Google OAuth', 1);
 
-/* Map admin user to local provider */
-DECLARE @AdminId INT = (SELECT UserId FROM dbo.Users WHERE Email='admin@history.local');
+/* Map local provider for sample users */
 DECLARE @LocalProviderId INT = (SELECT ProviderId FROM dbo.AuthProviders WHERE ProviderCode='local');
-IF @AdminId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.UserAuthProviders WHERE UserId=@AdminId AND ProviderId=@LocalProviderId)
+IF @LocalProviderId IS NOT NULL
 BEGIN
-  INSERT INTO dbo.UserAuthProviders(UserId, ProviderId, ProviderUserId, ProviderEmail, LastLoginAt)
-  VALUES (@AdminId, @LocalProviderId, CAST(@AdminId AS NVARCHAR(50)), 'admin@history.local', SYSUTCDATETIME());
+  DECLARE @EmailList TABLE(Email VARCHAR(255));
+  INSERT INTO @EmailList(Email) VALUES ('admin@history.local'),('teacher.local@test.com'),('student.local@test.com');
+  DECLARE @E VARCHAR(255);
+  DECLARE cur CURSOR FOR SELECT Email FROM @EmailList;
+  OPEN cur; FETCH NEXT FROM cur INTO @E;
+  WHILE @@FETCH_STATUS = 0
+  BEGIN
+    DECLARE @Uid INT = (SELECT UserId FROM dbo.Users WHERE Email=@E);
+    IF @Uid IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.UserAuthProviders WHERE UserId=@Uid AND ProviderId=@LocalProviderId)
+      INSERT INTO dbo.UserAuthProviders(UserId, ProviderId, ProviderUserId, ProviderEmail, LastLoginAt)
+      VALUES (@Uid, @LocalProviderId, CAST(@Uid AS NVARCHAR(50)), @E, SYSUTCDATETIME());
+    FETCH NEXT FROM cur INTO @E;
+  END
+  CLOSE cur; DEALLOCATE cur;
 END;
 
 /* Optional: demo Google-linked teacher account */
@@ -72,11 +92,15 @@ BEGIN
   VALUES (@TeacherId, @GoogleProviderId, 'google-sub-demo-123', 'teacher.google@test.com', NULL, SYSUTCDATETIME());
 END;
 
-/* Sample verification token for admin email (if none) */
-IF NOT EXISTS (SELECT 1 FROM dbo.VerificationTokens WHERE UserId=@AdminId AND Type='EmailVerify')
-BEGIN
+/* Sample verification tokens (admin + teacher) */
+DECLARE @AdminId INT = (SELECT UserId FROM dbo.Users WHERE Email='admin@history.local');
+DECLARE @TeacherLocalId INT = (SELECT UserId FROM dbo.Users WHERE Email='teacher.local@test.com');
+IF @AdminId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.VerificationTokens WHERE UserId=@AdminId AND Type='EmailVerify')
   INSERT INTO dbo.VerificationTokens(UserId, Token, Type, ExpiresAt)
-  VALUES (@AdminId, 'demo-verify-token-admin', 'EmailVerify', DATEADD(day, 7, SYSUTCDATETIME()));
-END;
+  VALUES (@AdminId, 'verify-admin-demo', 'EmailVerify', DATEADD(day, 7, SYSUTCDATETIME()));
+IF @TeacherLocalId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.VerificationTokens WHERE UserId=@TeacherLocalId AND Type='EmailVerify')
+  INSERT INTO dbo.VerificationTokens(UserId, Token, Type, ExpiresAt)
+  VALUES (@TeacherLocalId, 'verify-teacher-demo', 'EmailVerify', DATEADD(day, 7, SYSUTCDATETIME()));
 
 PRINT 'Auth providers & mappings seeded.';
+PRINT 'Sample users inserted: admin@history.local, teacher.local@test.com, student.local@test.com (password placeholder)';
