@@ -1,56 +1,114 @@
-// routes/index.jsx
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import AppLayout from '../layouts/AppLayout.jsx';
-import Dashboard from '../pages/Dashboard.jsx';
-import Lessons from '../pages/Lessons.jsx';
-import Quizzes from '../pages/Quizzes.jsx';
-import Analytics from '../pages/Analytics.jsx';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-const NotFound = () => (
-  <div style={{ 
-    padding: 48, 
-    textAlign: 'center',
-    fontSize: 18,
-    color: '#666'
-  }}>
-    <h2>404 - Không tìm thấy trang</h2>
-    <p>Trang bạn đang tìm kiếm không tồn tại.</p>
-  </div>
-);
+// Import pages
+import Home from '../pages/Home';
+import Dashboard from '../pages/Dashboard';
+import Lessons from '../pages/Lessons';
+import LessonDetail from '../pages/LessonDetail';
+import Quiz from '../pages/Quiz';
+import Login from '../pages/Login';
+import Register from '../pages/Register';
+import ProtectedRoute from '../components/ProtectedRoute';
+import AppLayout from '../layouts/AppLayout';
+import { Box, Typography, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 
-// Tạm thời trang Login/Register đơn giản
-const Login = () => (
-  <div style={{ padding: 48, textAlign: 'center' }}>
-    <h2>Đăng nhập</h2>
-    <p>Trang đăng nhập sẽ được phát triển sau</p>
-  </div>
-);
+// 404 Component
+const NotFound = () => {
+  const navigate = useNavigate();
+  
+  return (
+    <Box sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      p: 3,
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: 'white'
+    }}>
+      <Typography variant="h1" sx={{ fontSize: '6rem', fontWeight: 'bold', mb: 2 }}>
+        404
+      </Typography>
+      <Typography variant="h4" gutterBottom>
+        Không tìm thấy trang
+      </Typography>
+      <Typography variant="body1" sx={{ mb: 4, opacity: 0.8 }}>
+        Trang bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển.
+      </Typography>
+      <Button
+        variant="contained"
+        size="large"
+        onClick={() => navigate('/')}
+        sx={{
+          bgcolor: 'white',
+          color: '#667eea',
+          '&:hover': {
+            bgcolor: 'rgba(255,255,255,0.9)'
+          }
+        }}
+      >
+        Về trang chủ
+      </Button>
+    </Box>
+  );
+};
 
-const Register = () => (
-  <div style={{ padding: 48, textAlign: 'center' }}>
-    <h2>Đăng ký</h2>
-    <p>Trang đăng ký sẽ được phát triển sau</p>
-  </div>
-);
+const AppRoutes = () => {
+  const { user } = useAuth();
 
-const AppRoutes = () => (
-  <Routes>
-    {/* Main App Routes with Layout */}
-    <Route path="/" element={<AppLayout />}>
-      <Route index element={<Dashboard />} />
-      <Route path="lessons" element={<Lessons />} />
-      <Route path="quizzes" element={<Quizzes />} />
-      <Route path="analytics" element={<Analytics />} />
-    </Route>
-    
-    {/* Auth Routes (without layout) */}
-    <Route path="/login" element={<Login />} />
-    <Route path="/register" element={<Register />} />
-    
-    {/* 404 Route */}
-    <Route path="*" element={<NotFound />} />
-  </Routes>
-);
+  return (
+    <Routes>
+      {/* Public routes without layout */}
+      <Route path="/" element={<Home />} />
+      <Route path="/lesson/:slug" element={<LessonDetail />} />
+      
+      {/* Auth routes - redirect to dashboard if already logged in */}
+      <Route 
+        path="/login" 
+        element={user ? <Navigate to="/dashboard" replace /> : <Login />} 
+      />
+      <Route 
+        path="/register" 
+        element={user ? <Navigate to="/dashboard" replace /> : <Register />} 
+      />
+      
+      {/* Routes with AppLayout */}
+      <Route element={<AppLayout />}>
+        {/* Public route with layout */}
+        <Route path="/lessons" element={<Lessons />} />
+        
+        {/* Protected routes with layout */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
+          path="/quiz/:id" 
+          element={
+            <ProtectedRoute>
+              <Quiz />
+            </ProtectedRoute>
+          } 
+        />
+      </Route>
+      
+      {/* Legacy route redirect */}
+      <Route path="/lessons/:id" element={<Navigate to="/lesson/not-found" replace />} />
+      
+      {/* 404 route */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
 
 export default AppRoutes;

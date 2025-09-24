@@ -17,7 +17,12 @@ import {
   Divider,
   useTheme,
   useMediaQuery,
-  Badge
+  Badge,
+  Breadcrumbs,
+  Link,
+  Chip,
+  alpha,
+  Fade
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -28,18 +33,17 @@ import {
   Person as PersonIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
-  Notifications as NotificationsIcon
+  Notifications as NotificationsIcon,
+  Dashboard as DashboardIcon,
+  ChevronRight as ChevronRightIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 280;
 
-const menuItems = [
-  { text: 'Trang chủ', icon: <HomeIcon />, path: '/' },
-  { text: 'Bài học', icon: <SchoolIcon />, path: '/lessons' },
-  { text: 'Quiz & Bài tập', icon: <QuizIcon />, path: '/quizzes' },
-  { text: 'Thống kê', icon: <AnalyticsIcon />, path: '/analytics' },
-];
+
 
 const AppLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -48,6 +52,17 @@ const AppLayout = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
+
+  const menuItems = [
+    { text: 'Trang chủ', icon: HomeIcon, path: '/', color: '#2196f3' },
+    { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard', color: '#4caf50' },
+    { text: 'Bài học', icon: SchoolIcon, path: '/lessons', color: '#ff9800' },
+    { text: 'Bài kiểm tra', icon: QuizIcon, path: '/quizzes', color: '#e91e63' },
+    ...(user?.role === 'admin' ? [
+      { text: 'Thống kê', icon: AnalyticsIcon, path: '/analytics', color: '#9c27b0' }
+    ] : [])
+  ];
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -61,6 +76,56 @@ const AppLayout = () => {
     setAnchorEl(null);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+    handleProfileMenuClose();
+  };
+
+  const getBreadcrumbs = () => {
+    const pathnames = location.pathname.split('/').filter((x) => x);
+    const breadcrumbNameMap = {
+      dashboard: 'Dashboard',
+      lessons: 'Bài học', 
+      lesson: 'Chi tiết bài học',
+      quiz: 'Bài kiểm tra',
+      analytics: 'Thống kê',
+      profile: 'Hồ sơ',
+      settings: 'Cài đặt'
+    };
+
+    return [
+      <Link
+        key="home"
+        color="inherit"
+        onClick={() => navigate('/')}
+        sx={{ cursor: 'pointer', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+      >
+        <HomeIcon sx={{ mr: 0.5, fontSize: 20 }} />
+        Trang chủ
+      </Link>,
+      ...pathnames.map((value, index) => {
+        const last = index === pathnames.length - 1;
+        const to = `/${pathnames.slice(0, index + 1).join('/')}`;
+        
+        return last ? (
+          <Typography color="text.primary" key={to}>
+            {breadcrumbNameMap[value] || value}
+          </Typography>
+        ) : (
+          <Link
+            key={to}
+            color="inherit"
+            onClick={() => navigate(to)}
+            sx={{ cursor: 'pointer', textDecoration: 'none' }}
+          >
+            {breadcrumbNameMap[value] || value}
+          </Link>
+        );
+      }),
+    ];
+  };
+
   const handleNavigation = (path) => {
     navigate(path);
     if (isMobile) {
@@ -70,61 +135,90 @@ const AppLayout = () => {
 
   const drawer = (
     <Box>
+      {/* Logo */}
       <Box sx={{ 
         p: 3, 
-        display: 'flex', 
-        alignItems: 'center', 
-        background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+        borderBottom: '1px solid', 
+        borderColor: 'divider',
+        background: 'linear-gradient(135deg, #1976d2, #2196f3)',
         color: 'white'
       }}>
-        <SchoolIcon sx={{ mr: 2, fontSize: 32 }} />
-        <Box>
-          <Typography variant="h6" fontWeight="bold">
-            Lịch sử Lâm Đồng
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.8 }}>
-            Hệ thống học tập
-          </Typography>
-        </Box>
+        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+          🏛️ Lâm Đồng
+        </Typography>
+        <Typography variant="caption" sx={{ opacity: 0.9 }}>
+          Hệ thống giảng dạy lịch sử
+        </Typography>
       </Box>
-      
-      <List sx={{ pt: 2 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ px: 2, mb: 1 }}>
-            <ListItemButton
-              onClick={() => handleNavigation(item.path)}
-              selected={location.pathname === item.path}
-              sx={{
-                borderRadius: 2,
-                minHeight: 48,
-                '&.Mui-selected': {
-                  background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                  color: '#1976d2',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
-                  }
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                  borderRadius: 2,
-                }
+
+      {/* User Info */}
+      {user && (
+        <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Avatar 
+              sx={{ 
+                bgcolor: 'primary.main',
+                width: 48,
+                height: 48
               }}
             >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? '#1976d2' : 'inherit',
-                minWidth: 40 
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText 
-                primary={item.text}
-                primaryTypographyProps={{
-                  fontWeight: location.pathname === item.path ? 600 : 400
-                }}
+              {user.name?.charAt(0) || 'U'}
+            </Avatar>
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+              <Typography variant="subtitle1" noWrap fontWeight="medium">
+                {user.name}
+              </Typography>
+              <Chip 
+                label={user.role} 
+                size="small" 
+                color="primary" 
+                variant="outlined"
               />
-            </ListItemButton>
-          </ListItem>
-        ))}
+            </Box>
+          </Box>
+        </Box>
+      )}
+
+      {/* Navigation */}
+      <List sx={{ px: 2, py: 1 }}>
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path || 
+                          (item.path !== '/' && location.pathname.startsWith(item.path));
+          
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  borderRadius: 0,
+                  '&:hover': {
+                    bgcolor: alpha(item.color, 0.1),
+                  },
+                  ...(isActive && {
+                    bgcolor: alpha(item.color, 0.15),
+                    color: item.color,
+                    '&:hover': {
+                      bgcolor: alpha(item.color, 0.2),
+                    }
+                  })
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: isActive ? item.color : 'text.secondary',
+                  minWidth: 40 
+                }}>
+                  <item.icon />
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text}
+                  primaryTypographyProps={{
+                    fontWeight: isActive ? 'bold' : 'medium'
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
       </List>
     </Box>
   );
@@ -136,10 +230,11 @@ const AppLayout = () => {
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-          color: '#333',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-          borderBottom: '1px solid #e0e0e0'
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+          borderBottom: '1px solid',
+          borderColor: 'divider'
         }}
       >
         <Toolbar>
@@ -152,56 +247,81 @@ const AppLayout = () => {
           >
             <MenuIcon />
           </IconButton>
-          
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Hệ thống Giảng dạy Lịch sử Lâm Đồng
-          </Typography>
-          
+
+          {/* Breadcrumbs */}
+          <Box sx={{ flexGrow: 1 }}>
+            <Breadcrumbs
+              separator={<ChevronRightIcon fontSize="small" />}
+              aria-label="breadcrumb"
+            >
+              {getBreadcrumbs()}
+            </Breadcrumbs>
+          </Box>
+
+          {/* Right side icons */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton color="inherit">
+              <SearchIcon />
+            </IconButton>
+            
             <IconButton color="inherit">
               <Badge badgeContent={3} color="error">
                 <NotificationsIcon />
               </Badge>
             </IconButton>
-            
-            <IconButton
-              onClick={handleProfileMenuOpen}
-              sx={{ ml: 1 }}
-            >
-              <Avatar 
-                sx={{ 
-                  width: 36, 
-                  height: 36,
-                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)'
-                }}
+
+            {user && (
+              <IconButton
+                size="large"
+                edge="end"
+                aria-label="account of current user"
+                aria-haspopup="true"
+                onClick={handleProfileMenuOpen}
+                color="inherit"
               >
-                <PersonIcon />
-              </Avatar>
-            </IconButton>
+                <Avatar 
+                  sx={{ 
+                    bgcolor: 'primary.main',
+                    width: 32,
+                    height: 32 
+                  }}
+                >
+                  {user.name?.charAt(0) || 'U'}
+                </Avatar>
+              </IconButton>
+            )}
           </Box>
         </Toolbar>
       </AppBar>
 
       <Menu
         anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        keepMounted
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
         open={Boolean(anchorEl)}
         onClose={handleProfileMenuClose}
-        sx={{ mt: 1 }}
       >
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem onClick={() => { navigate('/profile'); handleProfileMenuClose(); }}>
           <ListItemIcon>
             <PersonIcon fontSize="small" />
           </ListItemIcon>
           Hồ sơ cá nhân
         </MenuItem>
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem onClick={() => { navigate('/settings'); handleProfileMenuClose(); }}>
           <ListItemIcon>
             <SettingsIcon fontSize="small" />
           </ListItemIcon>
           Cài đặt
         </MenuItem>
         <Divider />
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem onClick={handleLogout}>
           <ListItemIcon>
             <LogoutIcon fontSize="small" />
           </ListItemIcon>
@@ -234,7 +354,8 @@ const AppLayout = () => {
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: drawerWidth,
-              borderRight: '1px solid #e0e0e0'
+              borderRight: '1px solid #e0e0e0',
+              borderRadius: 0
             },
           }}
           open
@@ -249,13 +370,16 @@ const AppLayout = () => {
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          backgroundColor: '#f5f5f5'
+          bgcolor: 'background.default'
         }}
       >
-        <Toolbar />
-        <Box sx={{ p: 3 }}>
-          <Outlet />
-        </Box>
+        <Toolbar /> {/* Spacer for fixed AppBar */}
+        
+        <Fade in={true} timeout={500}>
+          <Box sx={{ p: 3 }}>
+            <Outlet />
+          </Box>
+        </Fade>
       </Box>
     </Box>
   );
