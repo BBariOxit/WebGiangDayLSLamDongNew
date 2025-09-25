@@ -45,6 +45,7 @@ import {
   KeyboardArrowUp
 } from '@mui/icons-material';
 import { lessonsData } from '../data/lessonsData';
+import quizService from '../services/quizService';
 import { useAuth } from '../contexts/AuthContext';
 import CommentSection from '../components/CommentSection';
 
@@ -57,6 +58,7 @@ const LessonDetail = () => {
   const [readingProgress, setReadingProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [quizDialog, setQuizDialog] = useState(false);
+  const [lessonQuiz, setLessonQuiz] = useState(null); // quiz object mapped to this lesson
   const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
@@ -64,10 +66,14 @@ const LessonDetail = () => {
     const foundLesson = lessonsData.find(l => l.slug === slug);
     if (foundLesson) {
       setLesson(foundLesson);
-      // Check if bookmarked (mock check)
       setIsBookmarked(Math.random() > 0.5);
-      // Check if completed
       setCompleted(foundLesson.progress === 100);
+      // Load quiz mapped by lessonId (string compare in service handled)
+      const q = quizService.getQuizByLessonId(foundLesson.id);
+      setLessonQuiz(q || null);
+    } else {
+      setLesson(null);
+      setLessonQuiz(null);
     }
   }, [slug]);
 
@@ -134,7 +140,13 @@ const LessonDetail = () => {
   };
 
   const handleQuizNavigate = () => {
-    navigate(`/quiz/${lesson.id}`);
+    if (!lessonQuiz) {
+      alert('Bài học này chưa có quiz.');
+      setQuizDialog(false);
+      return;
+    }
+    // Navigate to standardized take quiz route
+    navigate(`/quizzes/take/${lessonQuiz.id}`);
     setQuizDialog(false);
   };
 
@@ -316,19 +328,30 @@ const LessonDetail = () => {
                   variant="filled"
                 />
               )}
-              <Button
-                variant="contained"
-                startIcon={<Quiz />}
-                onClick={handleQuizStart}
-                sx={{
-                  background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #ee5a52, #e04848)'
-                  }
-                }}
-              >
-                Làm bài quiz
-              </Button>
+              {lessonQuiz ? (
+                <Button
+                  variant="contained"
+                  startIcon={<Quiz />}
+                  onClick={handleQuizStart}
+                  sx={{
+                    background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #ee5a52, #e04848)'
+                    }
+                  }}
+                >
+                  Làm bài quiz
+                </Button>
+              ) : (
+                <Button
+                  variant="outlined"
+                  startIcon={<Quiz />}
+                  disabled
+                  sx={{ opacity: 0.6 }}
+                >
+                  Chưa có quiz
+                </Button>
+              )}
             </Box>
           </Box>
         </Paper>
@@ -615,17 +638,25 @@ const LessonDetail = () => {
           <Typography variant="body1" paragraph>
             Bạn có muốn làm bài quiz để kiểm tra kiến thức đã học không?
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Bài quiz gồm 10 câu hỏi với thời gian 15 phút
-          </Typography>
+          {lessonQuiz ? (
+            <Typography variant="body2" color="text.secondary">
+              Bài quiz gồm {lessonQuiz.questions?.length || 0} câu hỏi{lessonQuiz.timeLimit && ` với thời gian ${lessonQuiz.timeLimit} phút`}.
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="error.main">
+              Bài học hiện chưa được gán quiz.
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
           <Button onClick={handleQuizClose} variant="outlined">
             Để sau
           </Button>
-          <Button onClick={handleQuizNavigate} variant="contained" autoFocus>
-            Bắt đầu ngay
-          </Button>
+          {lessonQuiz && (
+            <Button onClick={handleQuizNavigate} variant="contained" autoFocus>
+              Bắt đầu ngay
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

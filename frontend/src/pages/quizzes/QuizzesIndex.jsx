@@ -25,7 +25,10 @@ const QuizzesIndex = () => {
     }
   };
 
-  const quizzes = useMemo(() => quizService.getQuizzes(), []);
+  const quizzes = useMemo(() => {
+    // All quizzes including lesson-attached
+    return quizService.getQuizzes();
+  }, []);
   const filtered = useMemo(() => {
     return quizzes.filter(q => {
       const matchesSearch = q.title.toLowerCase().includes(search.toLowerCase()) || q.description.toLowerCase().includes(search.toLowerCase());
