@@ -362,7 +362,7 @@ const Lessons = () => {
                       cursor: isLocked ? 'not-allowed' : 'pointer',
                       position: 'relative',
                       // Use a fixed, smaller radius for a cleaner look (was 3 -> 3 * theme.shape.borderRadius)
-                      borderRadius: '12px',
+                      borderRadius: '8px',
                       overflow: 'hidden',
                       transition: 'all 0.3s ease',
                       opacity: isLocked ? 0.7 : 1,
@@ -598,10 +598,17 @@ const Lessons = () => {
           <Grid item xs={12} sm={3}>
             <Box>
               <Typography variant="h4" color="success.main" fontWeight="bold">
-                {lessons.reduce((sum, lesson) => sum + lesson.students, 0).toLocaleString()}
+                {
+                  // Sum total minutes across lessons by parsing the duration strings
+                  lessons.reduce((sum, lesson) => {
+                    const match = String(lesson.duration).match(/\d+/);
+                    const minutes = match ? parseInt(match[0], 10) : 0;
+                    return sum + minutes;
+                  }, 0)
+                }
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Học viên tham gia
+                Tổng thời lượng (phút)
               </Typography>
             </Box>
           </Grid>

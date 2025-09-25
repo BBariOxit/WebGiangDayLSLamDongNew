@@ -59,8 +59,11 @@ const AppLayout = () => {
     { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard', color: '#4caf50' },
     { text: 'Bài học', icon: SchoolIcon, path: '/lessons', color: '#ff9800' },
     { text: 'Bài kiểm tra', icon: QuizIcon, path: '/quizzes', color: '#e91e63' },
+    ...(user?.role === 'teacher' ? [
+      { text: 'GV: Quản lý Quiz', icon: QuizIcon, path: '/teacher/quizzes', color: '#00bcd4' }
+    ] : []),
     ...(user?.role === 'admin' ? [
-      { text: 'Thống kê', icon: AnalyticsIcon, path: '/analytics', color: '#9c27b0' }
+      { text: 'Thống kê', icon: AnalyticsIcon, path: '/admin/quizzes', color: '#9c27b0' }
     ] : [])
   ];
 

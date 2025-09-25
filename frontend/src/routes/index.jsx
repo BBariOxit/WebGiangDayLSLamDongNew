@@ -7,11 +7,16 @@ import Home from '../pages/Home';
 import Dashboard from '../pages/Dashboard';
 import Lessons from '../pages/Lessons';
 import LessonDetail from '../pages/LessonDetail';
-import Quiz from '../pages/Quiz';
+// Legacy Quiz page kept for lesson-tied quizzes; new quiz hub below
+import QuizzesIndex from '../pages/quizzes/QuizzesIndex';
+import TakeQuiz from '../pages/quizzes/TakeQuiz';
+import QuizResults from '../pages/quizzes/QuizResults';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AppLayout from '../layouts/AppLayout';
+import TeacherQuizzes from '../pages/teacher/TeacherQuizzes';
+import AdminQuizzes from '../pages/admin/AdminQuizzes';
 import { Box, Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -82,6 +87,52 @@ const AppRoutes = () => {
         {/* Public route with layout */}
         <Route path="/lessons" element={<Lessons />} />
         
+        {/* Quizzes hub (requires auth) */}
+        <Route 
+          path="/quizzes" 
+          element={
+            <ProtectedRoute>
+              <QuizzesIndex />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* Teacher routes */}
+        <Route 
+          path="/teacher/quizzes" 
+          element={
+            <ProtectedRoute requiredRole="teacher">
+              <TeacherQuizzes />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin routes */}
+        <Route 
+          path="/admin/quizzes" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminQuizzes />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/quizzes/take/:id" 
+          element={
+            <ProtectedRoute>
+              <TakeQuiz />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/quizzes/results/:attemptId" 
+          element={
+            <ProtectedRoute>
+              <QuizResults />
+            </ProtectedRoute>
+          } 
+        />
+        
         {/* Protected routes with layout */}
         <Route 
           path="/dashboard" 
@@ -92,14 +143,7 @@ const AppRoutes = () => {
           } 
         />
         
-        <Route 
-          path="/quiz/:id" 
-          element={
-            <ProtectedRoute>
-              <Quiz />
-            </ProtectedRoute>
-          } 
-        />
+        {/* Legacy single lesson quiz path remains for backward compatibility */}
       </Route>
       
       {/* Legacy route redirect */}

@@ -456,10 +456,15 @@ const Home = () => {
                 startIcon={<PersonAdd />}
                 onClick={() => navigate('/register')}
                 sx={{
-                  bgcolor: 'white',
-                  color: 'primary.main',
+                  background: 'linear-gradient(135deg, #9c27b0, #e91e63)',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 18px rgba(233, 30, 99, 0.35)',
+                  transform: 'translateZ(0)',
                   '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.9)'
+                    background: 'linear-gradient(135deg, #8e24aa, #d81b60)',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 24px rgba(233, 30, 99, 0.45)'
                   }
                 }}
               >
