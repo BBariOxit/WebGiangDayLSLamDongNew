@@ -1,20 +1,25 @@
-import sql from 'mssql';
+import pkg from 'pg';
 import { dbConfig } from './dbConfig.js';
 import { logger } from '../utils/logger.js';
 
-let poolPromise;
+const { Pool } = pkg;
+let pool;
 
 export function getPool() {
-  if (!poolPromise) {
-    poolPromise = sql.connect(dbConfig).then(pool => {
-      logger.info('Connected to SQL Server');
-      return pool;
-    }).catch(err => {
-      logger.error({ err }, 'SQL Server connection error');
-      throw err;
-    });
+  if (!pool) {
+    pool = new Pool(dbConfig);
+    pool.on('error', (err) => logger.error({ err }, 'PostgreSQL pool error'));
+    logger.info('PostgreSQL pool initialized');
   }
-  return poolPromise;
+  return pool;
 }
 
-export { sql };
+export async function query(text, params) {
+  const client = await getPool().connect();
+  try {
+    const res = await client.query(text, params);
+    return res;
+  } finally {
+    client.release();
+  }
+}

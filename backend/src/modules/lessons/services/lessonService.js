@@ -33,7 +33,8 @@ export async function updateLessonSvc(id, data, user) {
   ensureCanEdit(user);
   const existing = await getLessonById(id);
   if (!existing) throw new Error('Not found');
-  if (user.role !== 'Admin' && existing.CreatedBy !== user.id) throw new Error('Forbidden');
+  const createdBy = existing.CreatedBy ?? existing.created_by;
+  if (user.role !== 'Admin' && createdBy !== user.id) throw new Error('Forbidden');
   return updateLesson(id, data);
 }
 
@@ -41,7 +42,8 @@ export async function deleteLessonSvc(id, user) {
   ensureCanEdit(user);
   const existing = await getLessonById(id);
   if (!existing) throw new Error('Not found');
-  if (user.role !== 'Admin' && existing.CreatedBy !== user.id) throw new Error('Forbidden');
+  const createdBy = existing.CreatedBy ?? existing.created_by;
+  if (user.role !== 'Admin' && createdBy !== user.id) throw new Error('Forbidden');
   await deleteLesson(id);
   return { success: true };
 }

@@ -1,13 +1,12 @@
 import 'dotenv/config';
 
+// PostgreSQL config
 export const dbConfig = {
-  server: process.env.DB_SERVER || 'localhost',
-  database: process.env.DB_DATABASE || 'HistoryEduDB',
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: true,
-  },
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+  host: process.env.PG_HOST || 'localhost',
+  port: parseInt(process.env.PG_PORT || '5432', 10),
+  database: process.env.PG_DATABASE || 'historyedu',
+  user: process.env.PG_USER || 'postgres',
+  password: process.env.PG_PASSWORD || undefined,
+  max: 10,
+  idleTimeoutMillis: 30000
 };

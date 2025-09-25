@@ -14,14 +14,22 @@ import {
 } from '../repositories/authRepo.js';
 
 function buildAuthResponse(user) {
-  const accessToken = signAccessToken({ sub: user.UserId, role: user.RoleId });
+  // user fields could be camel/snake from repo; normalize
+  const id = user.UserId ?? user.user_id;
+  const email = user.Email ?? user.email;
+  const fullName = user.FullName ?? user.full_name;
+  const roleId = user.RoleId ?? user.role_id;
+  const status = user.Status ?? user.status;
+  const role = user.role_code || user.role || roleId; // prefer code string if present
+
+  const accessToken = signAccessToken({ sub: id, role });
   const refreshToken = signRefreshToken({ sub: user.UserId });
   const refreshExpMs = parseExpiry(process.env.JWT_REFRESH_EXPIRES || '30d');
   const expiresAt = new Date(Date.now() + refreshExpMs);
   // store refresh
-  insertRefreshToken({ userId: user.UserId, token: refreshToken, expiresAt });
+  insertRefreshToken({ userId: id, token: refreshToken, expiresAt });
   return {
-    user: { id: user.UserId, email: user.Email, name: user.FullName, roleId: user.RoleId, status: user.Status },
+    user: { id, email, name: fullName, roleId, status },
     accessToken,
     refreshToken
   };
@@ -53,8 +61,8 @@ export async function registerLocal({ email, password, name, role = 'Student' })
 export async function loginLocal({ email, password }) {
   const user = await findUserByEmail(email);
   if (!user) throw new Error('Invalid credentials');
-  if (!(await comparePassword(password, user.PasswordHash?.toString()))) throw new Error('Invalid credentials');
-  if (user.Status === 'Disabled') throw new Error('Account disabled');
+  if (!(await comparePassword(password, (user.PasswordHash ?? user.password_hash)?.toString()))) throw new Error('Invalid credentials');
+  if ((user.Status ?? user.status) === 'Disabled') throw new Error('Account disabled');
   return buildAuthResponse(user);
 }
 
@@ -86,16 +94,17 @@ export async function refreshSession({ token }) {
   if (!token) throw new Error('No token provided');
   const stored = await findRefreshToken(token);
   if (!stored || stored.RevokedAt) throw new Error('Invalid refresh token');
-  if (new Date(stored.ExpiresAt) < new Date()) throw new Error('Refresh token expired');
+  if (new Date((stored.ExpiresAt ?? stored.expires_at)) < new Date()) throw new Error('Refresh token expired');
   const payload = verifyRefreshToken(token); // ensure signature
-  if (payload.sub !== stored.UserId) throw new Error('Token user mismatch');
+  if (payload.sub !== (stored.UserId ?? stored.user_id)) throw new Error('Token user mismatch');
   await revokeRefreshToken(token, 'rotated');
   return buildAuthResponse({
-    UserId: stored.UserId,
-    Email: stored.Email,
-    FullName: stored.FullName,
-    RoleId: stored.RoleId,
-    Status: stored.Status
+    UserId: stored.UserId ?? stored.user_id,
+    Email: stored.Email ?? stored.email,
+    FullName: stored.FullName ?? stored.full_name,
+    RoleId: stored.RoleId ?? stored.role_id,
+    Status: stored.Status ?? stored.status,
+    role_code: stored.role_code
   });
 }
 
