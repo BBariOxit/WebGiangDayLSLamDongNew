@@ -51,9 +51,19 @@ const ProtectedRoute = ({ children, requiredRole = null, redirectTo = '/login' }
     return <Navigate to={redirectTo} state={{ from: location }} replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
-    // User doesn't have required role, redirect to home or show error
-    return <Navigate to="/" replace />;
+  if (requiredRole) {
+    const userRole = user.role?.toLowerCase();
+    const required = requiredRole.toLowerCase();
+    
+    // Admin có thể truy cập tất cả
+    if (userRole === 'admin') {
+      return children;
+    }
+    
+    // Check role cụ thể
+    if (userRole !== required) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return children;

@@ -46,6 +46,7 @@ import {
 } from '@mui/icons-material';
 import { lessonsData } from '../data/lessonsData';
 import { useAuth } from '../contexts/AuthContext';
+import CommentSection from '../components/CommentSection';
 
 const LessonDetail = () => {
   const { slug } = useParams();
@@ -550,6 +551,9 @@ const LessonDetail = () => {
             </Grid>
           </Paper>
         )}
+
+        {/* Comment Section */}
+        <CommentSection lessonId={lesson.id} lessonTitle={lesson.title} />
 
         {/* Navigation to Next Lesson */}
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -40,11 +40,16 @@ const Home = () => {
 
   const featuredLessons = lessonsData.slice(0, 3);
 
+  // Calculate more realistic stats
+  const totalMinutes = lessonsData.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
+  const totalStudents = lessonsData.reduce((sum, lesson) => sum + lesson.students, 0);
+  const averageRating = (lessonsData.reduce((sum, lesson) => sum + lesson.rating, 0) / lessonsData.length).toFixed(1);
+
   const stats = [
     { icon: MenuBook, label: 'Bài học', value: lessonsData.length, color: '#2196f3' },
-    { icon: Quiz, label: 'Bài quiz', value: lessonsData.length * 5, color: '#ff6b6b' },
-    { icon: People, label: 'Học viên', value: '800+', color: '#4caf50' },
-    { icon: EmojiEvents, label: 'Hoàn thành', value: '95%', color: '#ff9800' }
+    { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },
+    { icon: People, label: 'Lượt xem', value: `${Math.round(totalStudents/100)*100}+`, color: '#4caf50' },
+    { icon: EmojiEvents, label: 'Đánh giá', value: `${averageRating}/5⭐`, color: '#ff9800' }
   ];
 
   return (
