@@ -124,11 +124,6 @@ export const quizService = {
     const quizzes = load(QUIZZES_KEY, []);
     return quizzes.find(q => String(q.lessonId) === String(lessonId)) || null;
   },
-  // Multi-quiz support (restored)
-  getQuizzesByLessonId(lessonId) {
-    const quizzes = load(QUIZZES_KEY, []);
-    return quizzes.filter(q => String(q.lessonId) === String(lessonId));
-  },
   createQuiz(quiz) {
     const quizzes = load(QUIZZES_KEY, []);
     const newQuiz = { ...quiz, id: quiz.id || Date.now(), createdAt: new Date().toISOString() };

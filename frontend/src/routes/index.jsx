@@ -17,6 +17,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import AppLayout from '../layouts/AppLayout';
 import TeacherQuizzes from '../pages/teacher/TeacherQuizzes';
 import AdminQuizzes from '../pages/admin/AdminQuizzes';
+import AdminCreateQuiz from '../pages/admin/AdminCreateQuiz';
 import { Box, Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -108,6 +109,14 @@ const AppRoutes = () => {
         />
 
         {/* Admin routes */}
+        <Route 
+          path="/admin/create-quiz" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminCreateQuiz />
+            </ProtectedRoute>
+          }
+        />
         <Route 
           path="/admin/quizzes" 
           element={
