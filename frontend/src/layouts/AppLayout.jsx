@@ -63,7 +63,7 @@ const AppLayout = () => {
       { text: 'GV: Quản lý Quiz', icon: QuizIcon, path: '/teacher/quizzes', color: '#00bcd4' }
     ] : []),
     ...(user?.role === 'admin' ? [
-      { text: 'Admin: Tạo Quiz', icon: QuizIcon, path: '/admin/create-quiz', color: '#ff5722' },
+      { text: 'Admin: Quản lý Quiz', icon: QuizIcon, path: '/admin/create-quiz', color: '#ff5722' },
       { text: 'Thống kê', icon: AnalyticsIcon, path: '/admin/quizzes', color: '#9c27b0' }
     ] : [])
   ];

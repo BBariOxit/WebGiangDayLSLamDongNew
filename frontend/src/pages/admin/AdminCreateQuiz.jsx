@@ -6,9 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Box, Container, Typography, Paper, Grid, TextField, Button, 
   Select, MenuItem, InputLabel, FormControl, Divider, IconButton, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions, Alert
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Card, CardContent
 } from '@mui/material';
-import { Add, Edit, Delete, ArrowBack } from '@mui/icons-material';
+import { Add, Edit, Delete, ArrowBack, Quiz } from '@mui/icons-material';
 
 const empty = { title:'', description:'', difficulty:'Cơ bản', timeLimit:15, lessonId:'', questions:[] };
 const emptyQuestion = { text: '', options: ['', '', '', ''], correctIndex: 0, explanation: '' };
@@ -21,6 +21,17 @@ const AdminCreateQuiz = () => {
   const [currentQuestion, setCurrentQuestion] = React.useState(emptyQuestion);
   const [editingQuestionIndex, setEditingQuestionIndex] = React.useState(-1);
   const [successMessage, setSuccessMessage] = React.useState('');
+  const [existingQuizzes, setExistingQuizzes] = React.useState([]);
+  const [editingQuizId, setEditingQuizId] = React.useState(null);
+
+  // Load existing quizzes on component mount
+  React.useEffect(() => {
+    loadQuizzes();
+  }, []);
+
+  const loadQuizzes = () => {
+    setExistingQuizzes(quizService.getQuizzes());
+  };
 
   const save = () => {
     if (!form.title || form.questions.length === 0) {
@@ -33,14 +44,55 @@ const AdminCreateQuiz = () => {
       createdBy: user?.id, 
       createdByRole: 'admin' 
     };
-    quizService.createQuiz(payload);
-    setSuccessMessage('Tạo quiz thành công!');
+    
+    if (editingQuizId) {
+      // Update existing quiz
+      quizService.updateQuiz(editingQuizId, payload);
+      setSuccessMessage('Cập nhật quiz thành công!');
+      setEditingQuizId(null);
+    } else {
+      // Create new quiz
+      quizService.createQuiz(payload);
+      setSuccessMessage('Tạo quiz thành công!');
+    }
+    
     setForm(empty);
+    loadQuizzes();
     
     // Auto hide success message after 3 seconds
     setTimeout(() => {
       setSuccessMessage('');
     }, 3000);
+  };
+
+  const editExistingQuiz = (quiz) => {
+    setForm({
+      title: quiz.title,
+      description: quiz.description,
+      difficulty: quiz.difficulty,
+      timeLimit: quiz.timeLimit,
+      lessonId: quiz.lessonId || '',
+      questions: quiz.questions || []
+    });
+    setEditingQuizId(quiz.id);
+    setSuccessMessage('');
+  };
+
+  const deleteQuiz = (quizId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa quiz này?')) {
+      quizService.deleteQuiz(quizId);
+      loadQuizzes();
+      setSuccessMessage('Xóa quiz thành công!');
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+    }
+  };
+
+  const cancelEdit = () => {
+    setForm(empty);
+    setEditingQuizId(null);
+    setSuccessMessage('');
   };
 
   const addQuestion = () => {
@@ -88,7 +140,7 @@ const AdminCreateQuiz = () => {
           Quay lại
         </Button>
         <Typography variant="h4" fontWeight="bold">
-          Tạo Quiz Mới
+          Quản lý Quiz (Admin)
         </Typography>
       </Box>
 
@@ -103,9 +155,16 @@ const AdminCreateQuiz = () => {
         {/* Left Side - Create Form */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-              Thông tin quiz
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight="bold">
+                {editingQuizId ? 'Chỉnh sửa quiz' : 'Thông tin quiz mới'}
+              </Typography>
+              {editingQuizId && (
+                <Button size="small" onClick={cancelEdit} color="secondary">
+                  Hủy chỉnh sửa
+                </Button>
+              )}
+            </Box>
             
             <TextField 
               fullWidth 
@@ -193,7 +252,7 @@ const AdminCreateQuiz = () => {
               disabled={!form.title || form.questions.length === 0}
               sx={{ mt: 2 }}
             >
-              Lưu Quiz
+              {editingQuizId ? 'Cập nhật Quiz' : 'Tạo Quiz Mới'}
             </Button>
           </Paper>
         </Grid>
@@ -258,6 +317,85 @@ const AdminCreateQuiz = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Existing Quizzes List */}
+      <Paper sx={{ p: 3, mt: 4 }}>
+        <Typography variant="h6" fontWeight="bold" sx={{ mb: 3 }}>
+          Danh sách Quiz đã tạo ({existingQuizzes.length})
+        </Typography>
+        
+        {existingQuizzes.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+            Chưa có quiz nào được tạo
+          </Typography>
+        ) : (
+          <Grid container spacing={2}>
+            {existingQuizzes.map((quiz) => (
+              <Grid key={quiz.id} item xs={12}>
+                <Card 
+                  elevation={editingQuizId === quiz.id ? 3 : 1}
+                  sx={{ 
+                    border: editingQuizId === quiz.id ? '2px solid' : 'none',
+                    borderColor: editingQuizId === quiz.id ? 'primary.main' : 'transparent'
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="h6" fontWeight="bold" gutterBottom>
+                          {quiz.title}
+                          {editingQuizId === quiz.id && (
+                            <Chip label="Đang chỉnh sửa" size="small" color="primary" sx={{ ml: 1 }} />
+                          )}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                          {quiz.description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                          <Chip label={quiz.difficulty} size="small" />
+                          <Chip label={`${quiz.timeLimit} phút`} size="small" />
+                          <Chip label={`${quiz.questions?.length || 0} câu hỏi`} size="small" />
+                          {quiz.lessonId && (
+                            <Chip 
+                              label={`Bài học #${quiz.lessonId}`} 
+                              size="small" 
+                              color="secondary" 
+                            />
+                          )}
+                          <Chip 
+                            label={`Tạo: ${new Date(quiz.createdAt).toLocaleDateString('vi-VN')}`} 
+                            size="small" 
+                            variant="outlined"
+                          />
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Button
+                            size="small"
+                            startIcon={<Edit />}
+                            onClick={() => editExistingQuiz(quiz)}
+                            disabled={editingQuizId === quiz.id}
+                          >
+                            {editingQuizId === quiz.id ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}
+                          </Button>
+                          <Button
+                            size="small"
+                            startIcon={<Delete />}
+                            color="error"
+                            onClick={() => deleteQuiz(quiz.id)}
+                          >
+                            Xóa
+                          </Button>
+                        </Box>
+                      </Box>
+                      <Quiz color="action" sx={{ ml: 2 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Paper>
 
       {/* Question Dialog */}
       <Dialog open={questionDialog} onClose={() => setQuestionDialog(false)} maxWidth="md" fullWidth>
