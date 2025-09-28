@@ -1,0 +1,308 @@
+/* CSS cho nội dung bài học */
+.lesson-content {
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.8;
+  color: #333;
+}
+
+.lesson-content h1 {
+  color: #1976d2;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  border-bottom: 3px solid #1976d2;
+  padding-bottom: 1rem;
+}
+
+.lesson-content h2 {
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.lesson-content h3 {
+  color: #1976d2;
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.lesson-content h4 {
+  color: #555;
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.lesson-content p {
+  margin-bottom: 1rem;
+  text-align: justify;
+  line-height: 1.8;
+}
+
+.lesson-content ul,
+.lesson-content ol {
+  margin-bottom: 1rem;
+  padding-left: 2rem;
+}
+
+.lesson-content li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.lesson-content .highlight-box {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #2196f3;
+  margin: 1.5rem 0;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
+}
+
+.lesson-content .highlight-box h3 {
+  margin-top: 0;
+  color: #1976d2;
+}
+
+.lesson-content .timeline {
+  position: relative;
+  padding-left: 2rem;
+  margin: 2rem 0;
+}
+
+.lesson-content .timeline-item {
+  position: relative;
+  padding-bottom: 2rem;
+  margin-bottom: 1.5rem;
+  border-left: 2px solid #2196f3;
+  padding-left: 2rem;
+}
+
+.lesson-content .timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  background-color: #2196f3;
+  border-radius: 50%;
+}
+
+.lesson-content .benefits-grid,
+.lesson-content .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.lesson-content .benefit-item,
+.lesson-content .stat-item {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+.lesson-content .stat-item h4 {
+  margin-bottom: 0.5rem;
+  color: #1976d2;
+}
+
+.lesson-content .quote-box {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  padding: 1.5rem;
+  border-left: 4px solid #ff9800;
+  border-radius: 8px;
+  font-style: italic;
+  margin: 2rem 0;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.1);
+}
+
+.lesson-content .quote-box cite {
+  display: block;
+  text-align: right;
+  margin-top: 1rem;
+  font-weight: bold;
+  font-style: normal;
+  color: #ff9800;
+}
+
+.lesson-content .quiz-section {
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  padding: 2rem;
+  border-radius: 8px;
+  margin-top: 2rem;
+  border: 1px solid #9c27b0;
+}
+
+.lesson-content .quiz-section h2 {
+  color: #9c27b0;
+  margin-top: 0;
+}
+
+.lesson-content .key-points {
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 2rem 0;
+  border: 1px solid #4caf50;
+}
+
+.lesson-content .key-points h4 {
+  color: #2e7d32;
+  margin-top: 0;
+}
+
+.lesson-content .intro-section,
+.lesson-content .conclusion-section {
+  background: #fafafa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 2rem 0;
+  border-left: 4px solid #1976d2;
+}
+
+.lesson-content .region-detail,
+.lesson-content .ethnic-group {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.lesson-content .region-detail h3,
+.lesson-content .ethnic-group h3 {
+  margin-top: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.lesson-content .climate-zones .zone,
+.lesson-content .vision-points .vision-item {
+  background: #f8f9fa;
+  padding: 1rem;
+  margin: 1rem 0;
+  border-radius: 6px;
+  border-left: 3px solid #1976d2;
+}
+
+.lesson-content .heritage-grid,
+.lesson-content .policy-grid,
+.lesson-content .resources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.lesson-content .heritage-item,
+.lesson-content .policy-item,
+.lesson-content .resource-category {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.lesson-content .challenges-solutions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.lesson-content .challenge-item,
+.lesson-content .solution-item {
+  padding: 1.5rem;
+  border-radius: 8px;
+}
+
+.lesson-content .challenge-item {
+  background: #ffebee;
+  border-left: 4px solid #f44336;
+}
+
+.lesson-content .solution-item {
+  background: #e8f5e8;
+  border-left: 4px solid #4caf50;
+}
+
+.lesson-content .fusion-examples {
+  margin: 1rem 0;
+}
+
+.lesson-content .fusion-item {
+  background: #f0f8ff;
+  padding: 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  border-left: 3px solid #2196f3;
+}
+
+.lesson-content .language-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.lesson-content .language-group {
+  background: #fff8e1;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #ffcc02;
+}
+
+.lesson-content .diversity-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.lesson-content .stat-box {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #2196f3;
+}
+
+.lesson-content .stat-box h4 {
+  color: #1976d2;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .lesson-content .challenges-solutions {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .lesson-content .benefits-grid,
+  .lesson-content .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .lesson-content h1 {
+    font-size: 1.5rem;
+  }
+  
+  .lesson-content h2 {
+    font-size: 1.3rem;
+  }
+}
