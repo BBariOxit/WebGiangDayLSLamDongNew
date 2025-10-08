@@ -1,3 +1,5 @@
+import apiClient from './apiClient';
+
 // Quiz Service: mock implementation backed by localStorage with a clean API surface.
 // This can be swapped later to a REST/GraphQL client that hits a PostgreSQL-backed server.
 
@@ -111,7 +113,7 @@ function seedIfEmpty() {
 
 seedIfEmpty();
 
-export const quizService = {
+const quizService = {
   // Quizzes
   getQuizzes() {
     return load(QUIZZES_KEY, []);
@@ -179,7 +181,7 @@ export const quizService = {
     const averageScore = total ? Math.round(attempts.reduce((s, a) => s + a.score, 0) / total) : 0;
     const passRate = total ? Math.round((attempts.filter(a => a.score >= 70).length / total) * 100) : 0;
     return { totalAttempts: total, averageScore, passRate };
-    },
+  },
   getGlobalStats() {
     const quizzes = this.getQuizzes();
     const attempts = this.getAttempts();
@@ -191,3 +193,4 @@ export const quizService = {
 };
 
 export default quizService;
+export { quizService };

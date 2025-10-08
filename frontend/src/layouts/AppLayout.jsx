@@ -39,7 +39,7 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@features/auth/hooks/useAuth';
 
 const drawerWidth = 280;
 

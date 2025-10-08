@@ -20,7 +20,7 @@ import {
   alpha
 } from '@mui/material';
 import { lessonsData } from '../data/lessonsData';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 import {
   TrendingUp as TrendingUpIcon,
   School as SchoolIcon,

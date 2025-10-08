@@ -32,7 +32,7 @@ import {
   PersonAdd
 } from '@mui/icons-material';
 import { lessonsData } from '../data/lessonsData';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@features/auth/hooks/useAuth';
 
 const Home = () => {
   const navigate = useNavigate();

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { quizService } from '../../services/quizService';
+import { quizService } from '../../../shared/services/quizService';
 import {
   Box, Grid, Card, CardContent, Typography, Button, Chip, Paper, InputAdornment, TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';

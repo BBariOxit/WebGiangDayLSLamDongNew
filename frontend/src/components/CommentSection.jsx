@@ -51,8 +51,8 @@ import {
   Sort,
   Comment as CommentIcon
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
-import { useComments } from '../hooks/useComments';
+import { useAuth } from '@features/auth/hooks/useAuth';
+import { useComments } from '@shared/hooks/useComments';
 
 const CommentSection = ({ lessonId, lessonTitle }) => {
   const { user } = useAuth();

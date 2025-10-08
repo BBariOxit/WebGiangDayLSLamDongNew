@@ -1,6 +1,6 @@
 import React from 'react';
-import { quizService } from '../../services/quizService';
-import { useAuth } from '../../contexts/AuthContext';
+import { quizService } from '../../shared/services/quizService';
+import { useAuth } from '@features/auth/hooks/useAuth';
 import { 
   Box, Container, Typography, Paper, Grid, Card, CardContent, TextField, Button, 
   Select, MenuItem, InputLabel, FormControl, Divider, IconButton, Chip,

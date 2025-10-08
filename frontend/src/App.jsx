@@ -1,17 +1,9 @@
-// App.jsx
+// App.jsx - Main entry point that uses the new app structure
 import React from 'react';
-import { AuthProvider } from './contexts/AuthContext.jsx';
-import AppRoutes from './routes/index.jsx';
-import ErrorBoundary from './components/ErrorBoundary.jsx';
+import AppRoot from './app/App.jsx';
 
 function App() {
-  return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </ErrorBoundary>
-  );
+  return <AppRoot />;
 }
 
 export default App;

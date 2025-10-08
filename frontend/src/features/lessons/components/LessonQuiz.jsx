@@ -4,7 +4,7 @@ import {
 	Button, Typography, Box, LinearProgress, Chip, Stack, RadioGroup,
 	FormControlLabel, Radio, Divider, Alert
 } from '@mui/material';
-import quizService from '../services/quizService';
+import quizService from '../../../shared/services/quizService';
 
 // Props: lessonId (number), open (bool), onClose(), onCompleted(summary)
 export default function LessonQuiz({ lessonId, open, onClose, onCompleted }) {

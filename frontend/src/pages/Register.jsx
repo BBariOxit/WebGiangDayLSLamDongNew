@@ -30,7 +30,7 @@ import {
   School as SchoolIcon,
   PersonAddOutlined as RegisterIcon,
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@features/auth/hooks/useAuth';
 
 const Register = () => {
   const navigate = useNavigate();

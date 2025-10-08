@@ -1,5 +1,5 @@
 import React from 'react';
-import { quizService } from '../../services/quizService';
+import { quizService } from '../../shared/services/quizService';
 import { Container, Typography, Paper, Grid } from '@mui/material';
 
 const AdminQuizzes = () => {

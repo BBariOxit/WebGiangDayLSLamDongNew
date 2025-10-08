@@ -45,8 +45,8 @@ import {
   KeyboardArrowUp
 } from '@mui/icons-material';
 import { lessonsData } from '../data/lessonsData';
-import quizService from '../services/quizService';
-import { useAuth } from '../contexts/AuthContext';
+import quizService from '../shared/services/quizService';
+import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../components/CommentSection';
 
 const LessonDetail = () => {

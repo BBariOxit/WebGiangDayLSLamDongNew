@@ -44,10 +44,10 @@ import {
   Home,
   KeyboardArrowUp
 } from '@mui/icons-material';
-import { lessonsData } from '../data/lessonsData';
-import quizService from '../services/quizService';
-import { useAuth } from '../contexts/AuthContext';
-import CommentSection from '../components/CommentSection';
+import { lessonsData } from '../../../shared/constants/lessonsData';
+import quizService from '../../../shared/services/quizService';
+import { useAuth } from '../../auth/hooks/useAuth';
+import CommentSection from '../../../shared/components/CommentSection';
 
 const LessonDetail = () => {
   const { slug } = useParams();

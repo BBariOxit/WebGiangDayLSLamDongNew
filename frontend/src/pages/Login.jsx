@@ -28,7 +28,7 @@ import {
   LightbulbOutlined as LightbulbIcon,
   LoginOutlined as LoginIcon,
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@features/auth/hooks/useAuth';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -77,27 +77,15 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Find matching demo account
-    const matchedAccount = demoAccounts.find(
-      account => account.email === formData.email && account.password === formData.password
-    );
+    // Call login with credentials
+    const result = await login({
+      email: formData.email,
+      password: formData.password
+    });
 
-    if (matchedAccount) {
-      const result = await login({
-        name: matchedAccount.name,
-        email: matchedAccount.email,
-        role: matchedAccount.role
-      });
-
-      if (result.success) {
-        const from = location.state?.from?.pathname || '/';
-        navigate(from, { replace: true });
-      }
-    } else {
-      // Handle invalid credentials
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      clearError();
-      // You could set a custom error here if needed
+    if (result.success) {
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
     }
   };
 
@@ -111,10 +99,10 @@ const Login = () => {
 
   const handleDemoLogin = async (account) => {
     setFormData({ email: account.email, password: account.password });
+    
     const result = await login({
-      name: account.name,
       email: account.email,
-      role: account.role
+      password: account.password
     });
 
     if (result.success) {

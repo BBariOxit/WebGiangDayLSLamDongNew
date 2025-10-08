@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { quizService } from '../../services/quizService';
+import { quizService } from '../../../shared/services/quizService';
 import { Box, Container, Paper, Typography, Button, Chip } from '@mui/material';
 import { CheckCircle, Cancel } from '@mui/icons-material';
 

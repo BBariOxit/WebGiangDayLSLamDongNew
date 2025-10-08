@@ -1,3 +1,5 @@
+import apiClient from './apiClient';
+
 // Service để quản lý comment và rating cho các bài học
 class CommentService {
   constructor() {

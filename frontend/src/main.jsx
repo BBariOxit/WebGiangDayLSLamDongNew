@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { BrowserRouter as Router } from 'react-router-dom';
-import App from './App.jsx';
+import App from './app/App.jsx';
 
 // Enhanced modern theme with gradients and animations
 const theme = createTheme({

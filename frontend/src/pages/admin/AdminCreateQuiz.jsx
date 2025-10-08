@@ -1,7 +1,7 @@
 import React from 'react';
-import { quizService } from '../../services/quizService';
+import { quizService } from '../../shared/services/quizService';
 import { lessonsData } from '../../data/lessonsData';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@features/auth/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { 
   Box, Container, Typography, Paper, Grid, TextField, Button, 

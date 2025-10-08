@@ -42,7 +42,7 @@ import {
   Lock
 } from '@mui/icons-material';
 import { lessonsData } from '../data/lessonsData';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../auth/hooks/useAuth';
 
 const Lessons = () => {
   const navigate = useNavigate();
