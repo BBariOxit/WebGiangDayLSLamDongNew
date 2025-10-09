@@ -48,6 +48,7 @@ import axios from 'axios';
 import quizService from '../shared/services/quizService';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
+import { fetchRatingSummary } from '../api/lessonEngagementApi.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -63,6 +64,7 @@ const LessonDetail = () => {
   const [quizDialog, setQuizDialog] = useState(false);
   const [lessonQuiz, setLessonQuiz] = useState(null);
   const [completed, setCompleted] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState({ avg_rating: 0, rating_count: 0 });
 
   useEffect(() => {
     // Fetch lesson from API by slug
@@ -119,6 +121,11 @@ const LessonDetail = () => {
         // Load quiz mapped by lessonId
         const q = quizService.getQuizByLessonId(mappedLesson.id);
         setLessonQuiz(q || null);
+
+        try {
+          const rs = await fetchRatingSummary(mappedLesson.id);
+          setRatingSummary(rs);
+        } catch (e) { console.warn('Rating summary load failed', e); }
       } catch (error) {
         console.error('Error fetching lesson:', error);
         setLesson(null);
@@ -378,9 +385,9 @@ const LessonDetail = () => {
           {/* Rating & Progress */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Rating value={lesson.rating} precision={0.1} readOnly />
+              <Rating value={ratingSummary.avg_rating ? Number(ratingSummary.avg_rating) : 0} precision={0.1} readOnly />
               <Typography variant="body2" color="text.secondary">
-                ({lesson.rating}/5.0)
+                ({ratingSummary.avg_rating || 0}/5.0 · {ratingSummary.rating_count || 0} đánh giá)
               </Typography>
             </Box>
 
@@ -424,7 +431,7 @@ const LessonDetail = () => {
         {/* Lesson Content */}
         <Paper elevation={2} sx={{ p: 4, borderRadius: 3 }}>
           <Box
-            dangerouslySetInnerHTML={{ __html: lesson.contentHtml }}
+            dangerouslySetInnerHTML={{ __html: lesson.description || '' }}
             sx={{
               '& .lesson-content': {
                 '& h1, & h2, & h3, & h4': {
@@ -654,18 +661,10 @@ const LessonDetail = () => {
           </Button>
           
           <Button
-            variant="contained"
+            variant="outlined"
             endIcon={<NavigateNext />}
-            onClick={() => {
-              const currentIndex = lessonsData.findIndex(l => l.id === lesson.id);
-              const nextLesson = lessonsData[currentIndex + 1];
-              if (nextLesson) {
-                navigate(`/lesson/${nextLesson.slug}`);
-              }
-            }}
-            disabled={!lessonsData.find((l, index) => 
-              index > lessonsData.findIndex(lesson_item => lesson_item.id === lesson.id)
-            )}
+            disabled
+            title="Chức năng chuyển bài tiếp theo sẽ được cập nhật khi danh sách bài học đã nạp vào context"
           >
             Bài học tiếp theo
           </Button>

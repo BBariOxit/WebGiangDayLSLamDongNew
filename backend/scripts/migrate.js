@@ -1,8 +1,11 @@
+// Load environment variables early
+import 'dotenv/config';
 import { readFileSync, readdirSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getPool } from '../src/config/pool.js';
 import { logger } from '../src/utils/logger.js';
+import { dbConfig } from '../src/config/dbConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +26,7 @@ async function hasRun(client, name) {
 }
 
 async function main() {
+  logger.info({ dbConfig }, 'Running migrations with DB config');
   const pool = getPool();
   const client = await pool.connect();
   try {

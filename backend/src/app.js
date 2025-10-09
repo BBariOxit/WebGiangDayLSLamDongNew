@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import 'dotenv/config';
 import authRoutes from './modules/auth/routes/authRoutes.js';
 import lessonRoutes from './modules/lessons/routes/lessonRoutes.js';
+import lessonEngagementRoutes from './modules/lessons/routes/lessonEngagementRoutes.js';
 import quizRoutes from './modules/quizzes/routes/quizRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { ok, fail } from './utils/response.js';
@@ -25,6 +26,7 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => ok(res, { status: 'ok', timestamp: new Date() }));
 app.use('/api/auth', authRoutes);
 app.use('/api/lessons', lessonRoutes);
+app.use('/api/lessons', lessonEngagementRoutes); // nested engagement endpoints
 app.use('/api/quizzes', quizRoutes);
 
 // 404 handler
