@@ -45,22 +45,22 @@ const Login = () => {
   const demoAccounts = [
     { 
       email: 'admin@lamdong.edu.vn', 
-      password: 'admin123', 
-      name: 'Admin Hệ thống', 
+      password: 'demo123', 
+      name: 'Quản trị Hệ thống', 
       role: 'admin',
       color: '#f44336' 
     },
     { 
       email: 'teacher@lamdong.edu.vn', 
-      password: 'teacher123', 
-      name: 'GV. Nguyễn Văn A', 
+      password: 'demo123', 
+      name: 'GV. Trần Thị Giáo', 
       role: 'teacher',
       color: '#2196f3' 
     },
     { 
       email: 'student@lamdong.edu.vn', 
-      password: 'student123', 
-      name: 'HS. Trần Thị B', 
+      password: 'demo123', 
+      name: 'HS. Nguyễn Văn Học', 
       role: 'student',
       color: '#4caf50' 
     }
@@ -98,17 +98,19 @@ const Login = () => {
   };
 
   const handleDemoLogin = async (account) => {
+    // Set form state then perform login with known demo password (now unified as 'demo123')
     setFormData({ email: account.email, password: account.password });
-    
-    const result = await login({
-      email: account.email,
-      password: account.password
-    });
-
-    if (result.success) {
-      const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
-    }
+    // Slight delay to ensure state updates (optional but safe)
+    setTimeout(async () => {
+      const result = await login({
+        email: account.email,
+        password: account.password
+      });
+      if (result.success) {
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      }
+    }, 0);
   };
 
   return (

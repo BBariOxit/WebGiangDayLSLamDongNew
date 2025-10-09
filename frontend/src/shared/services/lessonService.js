@@ -9,39 +9,48 @@ class LessonService {
 
   // Get all lessons
   async getAllLessons() {
-    // TODO: Replace with API call when backend is ready
-    // const response = await apiClient.get('/lessons');
-    // return response.data;
-    return lessonsData;
+    try {
+      const res = await apiClient.get('/lessons');
+      return res.data?.data || [];
+    } catch (e) {
+      // fallback mock
+      return lessonsData;
+    }
   }
 
   // Get lesson by ID
   async getLessonById(id) {
-    // TODO: Replace with API call
-    // const response = await apiClient.get(`/lessons/${id}`);
-    // return response.data;
-    return lessonsData.find(lesson => lesson.id === parseInt(id));
+    try {
+      const res = await apiClient.get(`/lessons/${id}`);
+      return res.data?.data || null;
+    } catch (e) {
+      return lessonsData.find(lesson => lesson.id === parseInt(id));
+    }
   }
 
   // Get lesson by slug
   async getLessonBySlug(slug) {
-    // TODO: Replace with API call
-    // const response = await apiClient.get(`/lessons/slug/${slug}`);
-    // return response.data;
-    return lessonsData.find(lesson => lesson.slug === slug);
+    try {
+      const res = await apiClient.get(`/lessons/slug/${slug}`);
+      return res.data?.data || null;
+    } catch (e) {
+      return lessonsData.find(lesson => lesson.slug === slug);
+    }
   }
 
   // Search lessons
   async searchLessons(query) {
-    // TODO: Replace with API call
-    // const response = await apiClient.get('/lessons/search', { params: { q: query } });
-    // return response.data;
-    const lowerQuery = query.toLowerCase();
-    return lessonsData.filter(lesson =>
-      lesson.title.toLowerCase().includes(lowerQuery) ||
-      lesson.summary.toLowerCase().includes(lowerQuery) ||
-      lesson.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-    );
+    try {
+      const res = await apiClient.get('/lessons', { params: { q: query } });
+      return res.data?.data || [];
+    } catch (e) {
+      const lowerQuery = query.toLowerCase();
+      return lessonsData.filter(lesson =>
+        lesson.title.toLowerCase().includes(lowerQuery) ||
+        lesson.summary.toLowerCase().includes(lowerQuery) ||
+        lesson.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
+      );
+    }
   }
 
   // Filter lessons by category

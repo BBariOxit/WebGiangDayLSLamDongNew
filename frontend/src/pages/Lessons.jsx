@@ -25,7 +25,8 @@ import {
   Rating,
   Tooltip,
   Fade,
-  Skeleton
+  Skeleton,
+  Alert
 } from '@mui/material';
 import {
   Search,
@@ -41,8 +42,10 @@ import {
   CheckCircle,
   Lock
 } from '@mui/icons-material';
-import { lessonsData } from '../data/lessonsData';
+import axios from 'axios';
 import { useAuth } from '@features/auth/hooks/useAuth';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const Lessons = () => {
   const navigate = useNavigate();
@@ -56,16 +59,86 @@ const Lessons = () => {
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [bookmarkedLessons, setBookmarkedLessons] = useState(new Set());
+  const [error, setError] = useState(null);
 
-  // Mock loading
+  // Fetch lessons from API
   useEffect(() => {
-    setTimeout(() => {
-      setLessons(lessonsData);
-      setFilteredLessons(lessonsData);
-      setLoading(false);
-      // Mock bookmarked lessons
-      setBookmarkedLessons(new Set([1, 3]));
-    }, 1000);
+    const fetchLessons = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log('Fetching lessons from:', `${API_BASE_URL}/lessons?published=1`);
+        const response = await axios.get(`${API_BASE_URL}/lessons?published=1`);
+        console.log('API Raw Response:', response.data);
+        const payload = response.data && typeof response.data === 'object'
+          ? (Array.isArray(response.data) ? response.data : response.data.data)
+          : [];
+
+        if (!Array.isArray(payload)) {
+          console.warn('Unexpected lessons payload type:', typeof payload, payload);
+          setError('Dữ liệu trả về không đúng định dạng (expected array).');
+          setLessons([]);
+          setFilteredLessons([]);
+          return;
+        }
+
+        if (payload.length === 0) {
+          console.warn('No lessons found in payload');
+          setLessons([]);
+          setFilteredLessons([]);
+          return;
+        }
+        
+        const lessonsFromAPI = payload.map(lesson => {
+          console.log('Processing lesson:', lesson.lesson_id, lesson.title);
+          
+          // Parse images safely
+          let parsedImages = [];
+          if (lesson.images) {
+            if (Array.isArray(lesson.images)) {
+              parsedImages = lesson.images;
+            } else if (typeof lesson.images === 'string') {
+              try {
+                parsedImages = JSON.parse(lesson.images);
+              } catch (e) {
+                console.warn('Failed to parse images for lesson', lesson.lesson_id, e);
+              }
+            } else if (typeof lesson.images === 'object') {
+              // Already parsed by PostgreSQL driver
+              parsedImages = lesson.images;
+            }
+          }
+          
+          return {
+            id: lesson.lesson_id,
+            title: lesson.title,
+            slug: lesson.slug,
+            summary: lesson.summary || '',
+            description: lesson.content_html || '',
+            instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
+            duration: lesson.duration || '25 phút',
+            difficulty: lesson.difficulty || 'Cơ bản',
+            rating: parseFloat(lesson.rating) || 0,
+            students: lesson.students_count || 0,
+            progress: 0,
+            category: lesson.category || 'Lịch sử địa phương',
+            tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
+            status: lesson.status || 'Chưa học',
+            images: parsedImages
+          };
+        });
+        console.log('Mapped lessons:', lessonsFromAPI);
+        setLessons(lessonsFromAPI);
+        setFilteredLessons(lessonsFromAPI);
+      } catch (error) {
+        console.error('Error fetching lessons:', error);
+        setError(error.message || 'Không thể tải bài học');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLessons();
   }, []);
 
   // Filter and search logic
@@ -199,6 +272,13 @@ const Lessons = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       {/* Header */}
       <Box sx={{ mb: 4, textAlign: 'center' }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{
@@ -415,31 +495,36 @@ const Lessons = () => {
                       />
                     )}
 
-                    {/* Image placeholder */}
-                    <CardMedia
-                      sx={{
-                        height: 200,
-                        background: `linear-gradient(135deg, 
-                          ${lesson.id % 3 === 0 ? '#ff6b6b, #ee5a52' : 
-                            lesson.id % 3 === 1 ? '#4ecdc4, #44a08d' : 
-                            '#45b7d1, #96c93d'})`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative'
-                      }}
-                    >
-                      <Typography
-                        variant="h4"
-                        sx={{
-                          color: 'white',
-                          fontWeight: 'bold',
-                          textAlign: 'center',
-                          textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
-                        }}
-                      >
-                        {lesson.category}
-                      </Typography>
+                    {/* Image area */}
+                    <Box sx={{ position: 'relative', height: 200, overflow: 'hidden' }}>
+                      {lesson.images && lesson.images.length > 0 ? (
+                        <Box component="img"
+                             src={lesson.images[0].url}
+                             alt={lesson.title}
+                             sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      ) : (
+                        <Box sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: `linear-gradient(135deg, ${lesson.id % 3 === 0 ? '#ff6b6b, #ee5a52' : lesson.id % 3 === 1 ? '#4ecdc4, #44a08d' : '#45b7d1, #96c93d'})`
+                        }}>
+                          <Typography
+                            variant="h5"
+                            sx={{
+                              color: 'white',
+                              fontWeight: 'bold',
+                              textAlign: 'center',
+                              textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                              px: 2
+                            }}
+                          >
+                            {lesson.category}
+                          </Typography>
+                        </Box>
+                      )}
 
                       {/* Bookmark Button */}
                       <IconButton
@@ -449,16 +534,10 @@ const Lessons = () => {
                           top: 8,
                           right: 8,
                           bgcolor: 'rgba(255,255,255,0.9)',
-                          '&:hover': {
-                            bgcolor: 'rgba(255,255,255,1)'
-                          }
+                          '&:hover': { bgcolor: 'rgba(255,255,255,1)' }
                         }}
                       >
-                        {isBookmarked ? (
-                          <Bookmark sx={{ color: 'primary.main' }} />
-                        ) : (
-                          <BookmarkBorder />
-                        )}
+                        {isBookmarked ? (<Bookmark sx={{ color: 'primary.main' }} />) : (<BookmarkBorder />)}
                       </IconButton>
 
                       {/* Completion Badge */}
@@ -467,15 +546,10 @@ const Lessons = () => {
                           icon={<CheckCircle />}
                           label="Hoàn thành"
                           color="success"
-                          sx={{
-                            position: 'absolute',
-                            top: 8,
-                            left: 8,
-                            fontWeight: 'bold'
-                          }}
+                          sx={{ position: 'absolute', top: 8, left: 8, fontWeight: 'bold' }}
                         />
                       )}
-                    </CardMedia>
+                    </Box>
 
                     <CardContent sx={{ flexGrow: 1, p: 3 }}>
                       <Typography variant="h6" component="h2" gutterBottom sx={{

@@ -4,16 +4,33 @@ import helmet from 'helmet';
 import 'dotenv/config';
 import authRoutes from './modules/auth/routes/authRoutes.js';
 import lessonRoutes from './modules/lessons/routes/lessonRoutes.js';
+import quizRoutes from './modules/quizzes/routes/quizRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import { ok, fail } from './utils/response.js';
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*', credentials: true }));
+const origins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*';
+app.use(cors({ origin: origins, credentials: true }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
+
+// Routes
+app.get('/health', (req, res) => ok(res, { status: 'ok', timestamp: new Date() }));
 app.use('/api/auth', authRoutes);
 app.use('/api/lessons', lessonRoutes);
+app.use('/api/quizzes', quizRoutes);
+
+// 404 handler
+app.use((req, res) => fail(res, 404, 'Endpoint not found', 'NOT_FOUND', { path: req.path }));
+
+// Error handler
 app.use(errorHandler);
 
 export default app;

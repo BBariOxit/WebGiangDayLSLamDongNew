@@ -44,37 +44,91 @@ import {
   Home,
   KeyboardArrowUp
 } from '@mui/icons-material';
-import { lessonsData } from '../data/lessonsData';
+import axios from 'axios';
 import quizService from '../shared/services/quizService';
 import { useAuth } from '@features/auth/hooks/useAuth';
-import CommentSection from '../components/CommentSection';
+import CommentSection from '../shared/components/CommentSection';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const LessonDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { user, updateProgress } = useAuth();
   const [lesson, setLesson] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [readingProgress, setReadingProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [quizDialog, setQuizDialog] = useState(false);
-  const [lessonQuiz, setLessonQuiz] = useState(null); // quiz object mapped to this lesson
+  const [lessonQuiz, setLessonQuiz] = useState(null);
   const [completed, setCompleted] = useState(false);
 
   useEffect(() => {
-    // Tìm lesson theo slug
-    const foundLesson = lessonsData.find(l => l.slug === slug);
-    if (foundLesson) {
-      setLesson(foundLesson);
-      setIsBookmarked(Math.random() > 0.5);
-      setCompleted(foundLesson.progress === 100);
-      // Load quiz mapped by lessonId (string compare in service handled)
-      const q = quizService.getQuizByLessonId(foundLesson.id);
-      setLessonQuiz(q || null);
-    } else {
-      setLesson(null);
-      setLessonQuiz(null);
-    }
+    // Fetch lesson from API by slug
+    const fetchLesson = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API_BASE_URL}/lessons/slug/${slug}`);
+        console.log('Lesson raw response:', response.data);
+        const lessonData = response.data && response.data.data ? response.data.data : response.data;
+        if (!lessonData || !lessonData.lesson_id) {
+          console.warn('Lesson payload invalid:', lessonData);
+          setLesson(null);
+          return;
+        }
+        
+        // Parse images safely
+        let parsedImages = [];
+        if (lessonData.images) {
+          if (Array.isArray(lessonData.images)) {
+            parsedImages = lessonData.images;
+          } else if (typeof lessonData.images === 'string') {
+            try {
+              parsedImages = JSON.parse(lessonData.images);
+            } catch (e) {
+              console.warn('Failed to parse images', e);
+            }
+          } else if (typeof lessonData.images === 'object') {
+            parsedImages = lessonData.images;
+          }
+        }
+        
+        const mappedLesson = {
+          id: lessonData.lesson_id,
+          title: lessonData.title,
+          slug: lessonData.slug,
+          summary: lessonData.summary || '',
+          description: lessonData.content_html || '',
+          instructor: lessonData.instructor || 'Nhóm biên soạn địa phương',
+          duration: lessonData.duration || '25 phút',
+          difficulty: lessonData.difficulty || 'Cơ bản',
+          rating: parseFloat(lessonData.rating) || 0,
+          students: lessonData.students_count || 0,
+          progress: 0,
+          category: lessonData.category || 'Lịch sử địa phương',
+          tags: Array.isArray(lessonData.tags) ? lessonData.tags : ['Lịch sử'],
+          status: lessonData.status || 'Chưa học',
+          images: parsedImages
+        };
+        
+        setLesson(mappedLesson);
+        setIsBookmarked(Math.random() > 0.5);
+        setCompleted(mappedLesson.progress === 100);
+        
+        // Load quiz mapped by lessonId
+        const q = quizService.getQuizByLessonId(mappedLesson.id);
+        setLessonQuiz(q || null);
+      } catch (error) {
+        console.error('Error fetching lesson:', error);
+        setLesson(null);
+        setLessonQuiz(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLesson();
   }, [slug]);
 
   useEffect(() => {
@@ -88,7 +142,7 @@ const LessonDetail = () => {
       setShowScrollTop(winScroll > 300);
       
       // Auto save progress
-      if (scrolled > 50 && !completed) {
+      if (scrolled > 50 && !completed && lesson) {
         const newProgress = Math.min(Math.round(scrolled), 100);
         updateProgress(lesson?.id, newProgress);
         if (newProgress === 100) {
@@ -149,6 +203,17 @@ const LessonDetail = () => {
     navigate(`/quizzes/take/${lessonQuiz.id}`);
     setQuizDialog(false);
   };
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <LinearProgress sx={{ mb: 2 }} />
+          <Typography>Đang tải bài học...</Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   if (!lesson) {
     return (

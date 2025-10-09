@@ -1,59 +1,57 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../shared/services/apiClient';
-import mockAuthService from '../../shared/services/mockAuthService';
+import authService from '../../shared/services/authService';
 
-// Toggle this to switch between mock and real API
-const USE_MOCK_AUTH = true; // Set to false when backend is ready
+// Now using real backend API via authService
 
 export const registerThunk = createAsyncThunk('auth/register', async (form, { rejectWithValue }) => {
   try {
-    if (USE_MOCK_AUTH) {
-      const payload = {
-        email: form.email,
-        password: form.password,
-        name: form.name || form.fullName,
-        role: form.role || 'student',
-      };
-      const response = await mockAuthService.register(payload);
-      return response.data;
-    }
+    const payload = {
+      email: form.email,
+      password: form.password,
+      name: form.name || form.fullName,
+      role: form.role || 'Student',
+    };
     
-    // Real API call
-    const payload = { email: form.email, password: form.password, name: form.name, role: form.role === 'teacher' ? 'Teacher' : 'Student' };
-    const { data } = await api.post('/auth/register', payload);
-    return data;
+    const result = await authService.register(payload);
+    
+    if (result.success) {
+      return result; // { success: true, user, accessToken }
+    } else {
+      return rejectWithValue(result.error || 'Registration failed');
+    }
   } catch (e) {
-    return rejectWithValue(e.response?.data?.error || e.message);
+    return rejectWithValue(e.message || 'Registration failed');
   }
 });
 
 export const loginThunk = createAsyncThunk('auth/login', async (form, { rejectWithValue }) => {
   try {
-    if (USE_MOCK_AUTH) {
-      const response = await mockAuthService.login(form.email, form.password);
-      return response.data;
-    }
+    const result = await authService.login({
+      email: form.email,
+      password: form.password
+    });
     
-    // Real API call
-    const { data } = await api.post('/auth/login', { email: form.email, password: form.password });
-    return data;
+    if (result.success) {
+      return result; // { success: true, user, accessToken }
+    } else {
+      return rejectWithValue(result.error || 'Login failed');
+    }
   } catch (e) {
-    return rejectWithValue(e.response?.data?.error || e.message);
+    return rejectWithValue(e.message || 'Login failed');
   }
 });
 
 export const googleLoginThunk = createAsyncThunk('auth/google', async ({ idToken }, { rejectWithValue }) => {
   try {
-    if (USE_MOCK_AUTH) {
-      const response = await mockAuthService.loginWithGoogle(idToken);
-      return response.data;
-    }
+    const result = await authService.loginWithGoogle(idToken);
     
-    // Real API call
-    const { data } = await api.post('/auth/google', { idToken });
-    return data;
+    if (result.success) {
+      return result; // { success: true, user, accessToken }
+    } else {
+      return rejectWithValue(result.error || 'Google login failed');
+    }
   } catch (e) {
-    return rejectWithValue(e.response?.data?.error || e.message);
+    return rejectWithValue(e.message || 'Google login failed');
   }
 });
 

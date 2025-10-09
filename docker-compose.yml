@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: webgiangday-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: webgiangday_db
+      TZ: Asia/Ho_Chi_Minh
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "55432:5432" # changed host port to avoid conflict with local Windows postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Removed automatic schema/seed mounts so backend migrations (scripts/migrations/*.sql) define schema consistently
+      # If needed later, reintroduce or create separate init container
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d webgiangday_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - webgiangday-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: webgiangday-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@lamdong.edu.vn
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - webgiangday-network
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  webgiangday-network:
+    driver: bridge

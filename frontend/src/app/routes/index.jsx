@@ -18,6 +18,13 @@ import AppLayout from '../../shared/layouts/AppLayout';
 import TeacherQuizzes from '../../pages/teacher/TeacherQuizzes';
 import AdminQuizzes from '../../pages/admin/AdminQuizzes';
 import AdminCreateQuiz from '../../pages/admin/AdminCreateQuiz';
+
+// Management pages
+import LessonsManagement from '../../features/admin/pages/LessonsManagement';
+import QuizzesManagement from '../../features/admin/pages/QuizzesManagement';
+import TeacherLessons from '../../pages/teacher/TeacherLessons';
+import MyQuizzes from '../../features/teacher/pages/MyQuizzes';
+
 import { Box, Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -100,20 +107,28 @@ const AppRoutes = () => {
 
         {/* Teacher routes */}
         <Route 
+          path="/teacher/lessons" 
+          element={
+            <ProtectedRoute requiredRole="teacher">
+              <TeacherLessons />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
           path="/teacher/quizzes" 
           element={
             <ProtectedRoute requiredRole="teacher">
-              <TeacherQuizzes />
+              <MyQuizzes />
             </ProtectedRoute>
           }
         />
 
         {/* Admin routes */}
         <Route 
-          path="/admin/create-quiz" 
+          path="/admin/lessons" 
           element={
             <ProtectedRoute requiredRole="admin">
-              <AdminCreateQuiz />
+              <LessonsManagement />
             </ProtectedRoute>
           }
         />
@@ -121,7 +136,15 @@ const AppRoutes = () => {
           path="/admin/quizzes" 
           element={
             <ProtectedRoute requiredRole="admin">
-              <AdminQuizzes />
+              <QuizzesManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin/create-quiz" 
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminCreateQuiz />
             </ProtectedRoute>
           }
         />

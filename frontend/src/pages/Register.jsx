@@ -41,7 +41,7 @@ const Register = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student'
+    role: 'Student'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -243,8 +243,8 @@ const Register = () => {
                       onChange={handleInputChange}
                       label="Vai trò"
                     >
-                      <MenuItem value="student">Học sinh</MenuItem>
-                      <MenuItem value="teacher">Giáo viên</MenuItem>
+                      <MenuItem value="Student">Học sinh</MenuItem>
+                      <MenuItem value="Teacher">Giáo viên</MenuItem>
                     </Select>
                   </FormControl>
 

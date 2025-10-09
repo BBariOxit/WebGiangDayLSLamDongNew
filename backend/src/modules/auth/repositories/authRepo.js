@@ -22,7 +22,14 @@ export async function createUser({ email, passwordHash, fullName, roleId, status
     VALUES ($1,$2,$3,$4,$5,$6)
     RETURNING *
   `, [email, passwordHash || null, fullName, roleId, status, !!isEmailVerified]);
-  return r.rows[0];
+  
+  // Fetch with role info
+  const user = r.rows[0];
+  if (user) {
+    const withRole = await findUserByEmail(user.email);
+    return withRole;
+  }
+  return user;
 }
 
 export async function findProvider(code) {

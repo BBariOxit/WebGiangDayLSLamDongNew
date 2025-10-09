@@ -1,8 +1,8 @@
-// Script: setDevPasswords.js
-// Hash password '123456' for sample users defined in seed.sql
+// Script: setDevPasswords.js (PostgreSQL)
+// Hash password '123456' (or PASSWORD_OVERRIDE) for sample users defined in seed.sql
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
-import { getPool, sql } from '../src/config/pool.js';
+import { getPool } from '../src/config/pool.js';
 
 async function run() {
   const users = [
@@ -10,16 +10,14 @@ async function run() {
     'teacher.local@test.com',
     'student.local@test.com'
   ];
-  const hash = await bcrypt.hash('123456', parseInt(process.env.PASSWORD_SALT_ROUNDS || '10', 10));
-  const buf = Buffer.from(hash);
-  const pool = await getPool();
+  const plain = process.env.PASSWORD_OVERRIDE || '123456';
+  const hash = await bcrypt.hash(plain, parseInt(process.env.PASSWORD_SALT_ROUNDS || '10', 10));
+  const pool = getPool();
   for (const email of users) {
-    await pool.request()
-      .input('Email', sql.VarChar(255), email)
-      .input('PasswordHash', sql.VarBinary(256), buf)
-      .query('UPDATE Users SET PasswordHash=@PasswordHash WHERE Email=@Email');
-    console.log('Updated password for', email);
+    const result = await pool.query('UPDATE users SET password_hash=$1 WHERE email=$2', [hash, email]);
+    console.log('Updated password for', email, 'rows:', result.rowCount);
   }
+  console.log('Done. Use password:', plain);
   process.exit(0);
 }
 

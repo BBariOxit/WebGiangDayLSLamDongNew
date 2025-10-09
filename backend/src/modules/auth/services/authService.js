@@ -20,16 +20,19 @@ function buildAuthResponse(user) {
   const fullName = user.FullName ?? user.full_name;
   const roleId = user.RoleId ?? user.role_id;
   const status = user.Status ?? user.status;
-  const role = user.role_code || user.role || roleId; // prefer code string if present
+  const roleCode = user.role_code || user.role || roleId;
+  // Normalize role to lowercase for consistent frontend checks
+  const role = typeof roleCode === 'string' ? roleCode.toLowerCase() : roleCode;
 
   const accessToken = signAccessToken({ sub: id, role });
-  const refreshToken = signRefreshToken({ sub: user.UserId });
+  // use normalized id for refresh token subject (previously could be undefined if UserId not present)
+  const refreshToken = signRefreshToken({ sub: id });
   const refreshExpMs = parseExpiry(process.env.JWT_REFRESH_EXPIRES || '30d');
   const expiresAt = new Date(Date.now() + refreshExpMs);
   // store refresh
   insertRefreshToken({ userId: id, token: refreshToken, expiresAt });
   return {
-    user: { id, email, name: fullName, roleId, status },
+    user: { id, email, name: fullName, roleId, status, role },
     accessToken,
     refreshToken
   };
@@ -61,7 +64,12 @@ export async function registerLocal({ email, password, name, role = 'Student' })
 export async function loginLocal({ email, password }) {
   const user = await findUserByEmail(email);
   if (!user) throw new Error('Invalid credentials');
-  if (!(await comparePassword(password, (user.PasswordHash ?? user.password_hash)?.toString()))) throw new Error('Invalid credentials');
+  
+  const passwordHash = user.password_hash;
+  if (!passwordHash) throw new Error('Invalid credentials');
+  
+  const isValid = await comparePassword(password, passwordHash);
+  if (!isValid) throw new Error('Invalid credentials');
   if ((user.Status ?? user.status) === 'Disabled') throw new Error('Account disabled');
   return buildAuthResponse(user);
 }

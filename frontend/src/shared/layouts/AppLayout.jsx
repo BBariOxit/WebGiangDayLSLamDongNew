@@ -60,11 +60,13 @@ const AppLayout = () => {
     { text: 'Bài học', icon: SchoolIcon, path: '/lessons', color: '#ff9800' },
     { text: 'Bài kiểm tra', icon: QuizIcon, path: '/quizzes', color: '#e91e63' },
     ...(user?.role === 'teacher' ? [
+      { text: 'GV: Quản lý Bài học', icon: SchoolIcon, path: '/teacher/lessons', color: '#00bcd4' },
       { text: 'GV: Quản lý Quiz', icon: QuizIcon, path: '/teacher/quizzes', color: '#00bcd4' }
     ] : []),
     ...(user?.role === 'admin' ? [
-      { text: 'Admin: Quản lý Quiz', icon: QuizIcon, path: '/admin/create-quiz', color: '#ff5722' },
-      { text: 'Thống kê', icon: AnalyticsIcon, path: '/admin/quizzes', color: '#9c27b0' }
+      { text: 'Admin: Quản lý Bài học', icon: SchoolIcon, path: '/admin/lessons', color: '#ff5722' },
+      { text: 'Admin: Quản lý Quiz', icon: QuizIcon, path: '/admin/quizzes', color: '#ff5722' },
+      { text: 'Thống kê', icon: AnalyticsIcon, path: '/analytics', color: '#9c27b0' }
     ] : [])
   ];
 

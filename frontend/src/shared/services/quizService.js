@@ -122,7 +122,15 @@ const quizService = {
     const quizzes = load(QUIZZES_KEY, []);
     return quizzes.find(q => String(q.id) === String(id)) || null;
   },
-  getQuizByLessonId(lessonId) {
+  async getQuizByLessonId(lessonId) {
+    // Try backend first
+    try {
+      const res = await apiClient.get(`/quizzes/${lessonId}`);
+      // backend returns { success, data: { lessonId, questions:[...] } }
+      if (res.data?.data) return res.data.data;
+    } catch (e) {
+      // ignore and fallback
+    }
     const quizzes = load(QUIZZES_KEY, []);
     return quizzes.find(q => String(q.lessonId) === String(lessonId)) || null;
   },
@@ -158,7 +166,15 @@ const quizService = {
   getAttemptsByQuiz(quizId) {
     return this.getAttempts().filter(a => String(a.quizId) === String(quizId));
   },
-  saveAttempt({ userId, quizId, score, durationSeconds, answers }) {
+  async saveAttempt({ userId, quizId, score, durationSeconds, answers }) {
+    // If backend expects lessonId, quizId here maps to lessonId (front naming mismatch)
+    try {
+      const payload = { answers: answers.map(a => ({ questionId: a.questionId, selectedAnswers: a.selectedAnswers })) };
+      const res = await apiClient.post(`/quizzes/${quizId}/submit`, payload);
+      if (res.data?.data) return res.data.data;
+    } catch (e) {
+      // fallback local
+    }
     const attempts = this.getAttempts();
     const attempt = {
       id: Date.now(),

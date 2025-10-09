@@ -1,0 +1,36 @@
+{
+  "name": "webgiangday-root",
+  "version": "1.0.0",
+  "description": "WebGiangDay Lâm Đồng - Learning Management System",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "db:start": "docker-compose up -d",
+    "db:stop": "docker-compose down",
+    "db:restart": "docker-compose restart postgres",
+    "db:reset": "docker-compose down -v && docker-compose up -d",
+    "db:logs": "docker-compose logs -f postgres",
+    "db:shell": "docker exec -it webgiangday-postgres psql -U admin -d webgiangday_db",
+    "db:backup": "docker exec -t webgiangday-postgres pg_dump -U admin webgiangday_db > database/backup.sql",
+    "backend": "cd backend && npm run dev:simple",
+    "backend:full": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "dev:backend": "concurrently \"npm run db:start\" \"npm run backend\"",
+    "dev:frontend": "npm run frontend",
+    "dev:all": "concurrently \"npm run db:start\" \"npm run backend\" \"npm run frontend\"",
+    "dev": "npm run dev:all",
+    "test:api": "echo 'Testing API endpoints...' && curl http://localhost:4000/api/health"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "education",
+    "lms",
+    "lamdong",
+    "vietnam",
+    "learning"
+  ],
+  "author": "",
+  "license": "MIT"
+}

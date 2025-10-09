@@ -1,0 +1,420 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box, Container, Typography, Button, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, IconButton, Chip, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, Switch, FormControlLabel,
+  Alert, CircularProgress, Stack, Tooltip, MenuItem, Select, FormControl,
+  InputLabel, Grid
+} from '@mui/material';
+import {
+  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
+  Visibility as VisibilityIcon, Article as ArticleIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
+import { lessonService } from '../../../shared/services/managementService';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+
+const LessonsManagement = () => {
+  const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    summary: '',
+    contentHtml: '',
+    isPublished: false,
+    instructor: '',
+    duration: '',
+    difficulty: 'Cơ bản',
+    category: '',
+    tags: [],
+    images: []
+  });
+  const [tagInput, setTagInput] = useState('');
+  const [imageInput, setImageInput] = useState({ url: '', caption: '' });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    loadLessons();
+  }, []);
+
+  const loadLessons = async () => {
+    try {
+      setLoading(true);
+      const res = await lessonService.list();
+      setLessons(res.data || []);
+    } catch (e) {
+      setError('Không thể tải danh sách bài học: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setEditingLesson(null);
+    setFormData({ 
+      title: '', 
+      summary: '', 
+      contentHtml: '', 
+      isPublished: false,
+      instructor: 'Nhóm biên soạn địa phương',
+      duration: '25 phút',
+      difficulty: 'Cơ bản',
+      category: 'Lịch sử địa phương',
+      tags: [],
+      images: []
+    });
+    setTagInput('');
+    setImageInput({ url: '', caption: '' });
+    setOpenDialog(true);
+  };
+
+  const handleOpenEdit = async (lesson) => {
+    try {
+      const res = await lessonService.getById(lesson.lesson_id);
+      const data = res.data;
+      setEditingLesson(data);
+      setFormData({
+        title: data.title || '',
+        summary: data.summary || '',
+        contentHtml: data.content_html || '',
+        isPublished: data.is_published || false,
+        instructor: data.instructor || 'Nhóm biên soạn địa phương',
+        duration: data.duration || '25 phút',
+        difficulty: data.difficulty || 'Cơ bản',
+        category: data.category || 'Lịch sử địa phương',
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        images: Array.isArray(data.images) ? data.images : 
+                (typeof data.images === 'string' ? JSON.parse(data.images) : [])
+      });
+      setTagInput('');
+      setImageInput({ url: '', caption: '' });
+      setOpenDialog(true);
+    } catch (e) {
+      setError('Không thể tải bài học: ' + e.message);
+    }
+  };
+
+  const handleClose = () => {
+    setOpenDialog(false);
+    setEditingLesson(null);
+    setFormData({ 
+      title: '', 
+      summary: '', 
+      contentHtml: '', 
+      isPublished: false,
+      instructor: '',
+      duration: '',
+      difficulty: 'Cơ bản',
+      category: '',
+      tags: [],
+      images: []
+    });
+    setTagInput('');
+    setImageInput({ url: '', caption: '' });
+  };
+
+  const handleAddTag = () => {
+    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
+      setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] });
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove) => {
+    setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
+  };
+
+  const handleAddImage = () => {
+    if (imageInput.url.trim()) {
+      setFormData({ 
+        ...formData, 
+        images: [...formData.images, { url: imageInput.url.trim(), caption: imageInput.caption.trim() }] 
+      });
+      setImageInput({ url: '', caption: '' });
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
+  };
+
+  const handleSave = async () => {
+    try {
+      setError('');
+      if (!formData.title.trim()) {
+        setError('Vui lòng nhập tiêu đề');
+        return;
+      }
+
+      if (editingLesson) {
+        await lessonService.update(editingLesson.lesson_id, formData);
+        setSuccess('Cập nhật bài học thành công!');
+      } else {
+        await lessonService.create(formData);
+        setSuccess('Tạo bài học thành công!');
+      }
+
+      handleClose();
+      loadLessons();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e) {
+      setError(e.response?.data?.error || e.message);
+    }
+  };
+
+  const handleDelete = async (lessonId) => {
+    if (!window.confirm('Bạn có chắc muốn xóa bài học này?')) return;
+    try {
+      await lessonService.delete(lessonId);
+      setSuccess('Xóa bài học thành công!');
+      loadLessons();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (e) {
+      setError('Không thể xóa: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ArticleIcon fontSize="large" color="primary" />
+          Quản lý Bài học
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenCreate}
+          size="large"
+        >
+          Tạo Bài học mới
+        </Button>
+      </Stack>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+
+      <TableContainer component={Paper} elevation={2}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'primary.main' }}>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tiêu đề</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tóm tắt</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Trạng thái</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ngày tạo</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Thao tác</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {lessons.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">Chưa có bài học nào</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              lessons.map((lesson) => (
+                <TableRow key={lesson.lesson_id} hover>
+                  <TableCell>{lesson.lesson_id}</TableCell>
+                  <TableCell><strong>{lesson.title}</strong></TableCell>
+                  <TableCell>{lesson.summary || '—'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={lesson.is_published ? 'Đã xuất bản' : 'Nháp'}
+                      color={lesson.is_published ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{new Date(lesson.created_at).toLocaleDateString('vi-VN')}</TableCell>
+                  <TableCell align="center">
+                    <Tooltip title="Chỉnh sửa">
+                      <IconButton color="primary" onClick={() => handleOpenEdit(lesson)}>
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Xóa">
+                      <IconButton color="error" onClick={() => handleDelete(lesson.lesson_id)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={openDialog} onClose={handleClose} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {editingLesson ? 'Chỉnh sửa Bài học' : 'Tạo Bài học mới'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <TextField
+              label="Tiêu đề"
+              fullWidth
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            />
+            <TextField
+              label="Tóm tắt"
+              fullWidth
+              multiline
+              rows={2}
+              value={formData.summary}
+              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
+            />
+
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Giảng viên"
+                  fullWidth
+                  value={formData.instructor}
+                  onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Thời lượng (vd: 25 phút)"
+                  fullWidth
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Độ khó</InputLabel>
+                  <Select
+                    value={formData.difficulty}
+                    label="Độ khó"
+                    onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                  >
+                    <MenuItem value="Cơ bản">Cơ bản</MenuItem>
+                    <MenuItem value="Trung bình">Trung bình</MenuItem>
+                    <MenuItem value="Nâng cao">Nâng cao</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Danh mục"
+                  fullWidth
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  placeholder="vd: Lịch sử địa phương"
+                />
+              </Grid>
+            </Grid>
+
+            {/* Tags */}
+            <Box>
+              <Typography variant="subtitle2" mb={1}>Tags</Typography>
+              <Stack direction="row" spacing={1} mb={1} flexWrap="wrap">
+                {formData.tags.map((tag, index) => (
+                  <Chip
+                    key={index}
+                    label={tag}
+                    onDelete={() => handleRemoveTag(tag)}
+                    color="primary"
+                    size="small"
+                    sx={{ mb: 1 }}
+                  />
+                ))}
+              </Stack>
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  size="small"
+                  placeholder="Nhập tag mới..."
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                  fullWidth
+                />
+                <Button variant="outlined" onClick={handleAddTag}>Thêm</Button>
+              </Stack>
+            </Box>
+
+            {/* Images */}
+            <Box>
+              <Typography variant="subtitle2" mb={1}>Hình ảnh</Typography>
+              <Stack spacing={2} mb={2}>
+                {formData.images.map((img, index) => (
+                  <Paper key={index} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>{img.url}</Typography>
+                      {img.caption && <Typography variant="caption" color="text.secondary">{img.caption}</Typography>}
+                    </Box>
+                    <IconButton size="small" color="error" onClick={() => handleRemoveImage(index)}>
+                      <CloseIcon />
+                    </IconButton>
+                  </Paper>
+                ))}
+              </Stack>
+              <Stack spacing={1}>
+                <TextField
+                  size="small"
+                  placeholder="URL hình ảnh..."
+                  value={imageInput.url}
+                  onChange={(e) => setImageInput({ ...imageInput, url: e.target.value })}
+                  fullWidth
+                />
+                <TextField
+                  size="small"
+                  placeholder="Chú thích (tùy chọn)..."
+                  value={imageInput.caption}
+                  onChange={(e) => setImageInput({ ...imageInput, caption: e.target.value })}
+                  fullWidth
+                />
+                <Button variant="outlined" onClick={handleAddImage} fullWidth>Thêm hình ảnh</Button>
+              </Stack>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" mb={1}>Nội dung</Typography>
+              <ReactQuill
+                theme="snow"
+                value={formData.contentHtml}
+                onChange={(content) => setFormData({ ...formData, contentHtml: content })}
+                style={{ height: '300px', marginBottom: '60px' }}
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.isPublished}
+                  onChange={(e) => setFormData({ ...formData, isPublished: e.target.checked })}
+                />
+              }
+              label="Xuất bản ngay"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose}>Hủy</Button>
+          <Button variant="contained" onClick={handleSave}>
+            {editingLesson ? 'Cập nhật' : 'Tạo mới'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
+  );
+};
+
+export default LessonsManagement;
