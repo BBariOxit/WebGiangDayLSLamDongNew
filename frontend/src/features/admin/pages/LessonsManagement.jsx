@@ -11,7 +11,8 @@ import {
   Visibility as VisibilityIcon, Article as ArticleIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import { lessonService } from '../../../shared/services/managementService';
+import { lessonService, quizManagementService } from '../../../shared/services/managementService';
+import Divider from '@mui/material/Divider';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -24,7 +25,7 @@ const LessonsManagement = () => {
     title: '',
     summary: '',
     contentHtml: '',
-    isPublished: false,
+    isPublished: true,
     instructor: '',
     duration: '',
     difficulty: 'Cơ bản',
@@ -36,6 +37,18 @@ const LessonsManagement = () => {
   const [imageInput, setImageInput] = useState({ url: '', caption: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [attachedQuizzes, setAttachedQuizzes] = useState([]);
+  // Create attached quiz toggles and form
+  const [createQuiz, setCreateQuiz] = useState(false);
+  const [quizForm, setQuizForm] = useState({
+    title: '',
+    description: '',
+    difficulty: 'Cơ bản',
+    timeLimit: 10,
+    questions: [
+      { questionText: '', options: ['', '', '', ''], correctIndex: 0 }
+    ]
+  });
 
   useEffect(() => {
     loadLessons();
@@ -59,13 +72,21 @@ const LessonsManagement = () => {
       title: '', 
       summary: '', 
       contentHtml: '', 
-      isPublished: false,
+      isPublished: true,
       instructor: 'Nhóm biên soạn địa phương',
       duration: '25 phút',
       difficulty: 'Cơ bản',
       category: 'Lịch sử địa phương',
       tags: [],
       images: []
+    });
+    setCreateQuiz(false);
+    setQuizForm({
+      title: '',
+      description: '',
+      difficulty: 'Cơ bản',
+      timeLimit: 10,
+      questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }]
     });
     setTagInput('');
     setImageInput({ url: '', caption: '' });
@@ -90,6 +111,11 @@ const LessonsManagement = () => {
         images: Array.isArray(data.images) ? data.images : 
                 (typeof data.images === 'string' ? JSON.parse(data.images) : [])
       });
+      // Optionally: fetch attached quizzes for this lesson to show quick info
+      try {
+        const qres = await quizManagementService.list({ lessonId: data.lesson_id });
+        setAttachedQuizzes(qres.data || []);
+      } catch {}
       setTagInput('');
       setImageInput({ url: '', caption: '' });
       setOpenDialog(true);
@@ -105,7 +131,7 @@ const LessonsManagement = () => {
       title: '', 
       summary: '', 
       contentHtml: '', 
-      isPublished: false,
+      isPublished: true,
       instructor: '',
       duration: '',
       difficulty: 'Cơ bản',
@@ -113,6 +139,8 @@ const LessonsManagement = () => {
       tags: [],
       images: []
     });
+    setCreateQuiz(false);
+    setQuizForm({ title: '', description: '', difficulty: 'Cơ bản', timeLimit: 10, questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }] });
     setTagInput('');
     setImageInput({ url: '', caption: '' });
   };
@@ -154,8 +182,31 @@ const LessonsManagement = () => {
         await lessonService.update(editingLesson.lesson_id, formData);
         setSuccess('Cập nhật bài học thành công!');
       } else {
-        await lessonService.create(formData);
+        const created = await lessonService.create(formData);
+        const lesson = created?.data;
         setSuccess('Tạo bài học thành công!');
+        // Optionally create attached quiz
+        if (createQuiz && lesson?.lesson_id) {
+          // build payload
+          const payload = {
+            title: quizForm.title?.trim() || `Quiz: ${formData.title}`,
+            description: quizForm.description || '',
+            lessonId: lesson.lesson_id,
+            difficulty: quizForm.difficulty,
+            timeLimit: Number(quizForm.timeLimit) || 10,
+            questions: (quizForm.questions || [])
+              .filter(q => (q.questionText || '').trim() && (q.options || []).some(opt => (opt || '').trim()))
+              .map(q => ({
+                questionText: q.questionText,
+                options: (q.options || []).map(o => o || '').filter(o => o.trim() !== ''),
+                correctIndex: Math.max(0, Math.min((q.options || []).length - 1, Number(q.correctIndex) || 0))
+              }))
+          };
+          if (payload.questions.length > 0) {
+            await quizManagementService.create(payload);
+            setSuccess('Tạo bài học và quiz đi kèm thành công!');
+          }
+        }
       }
 
       handleClose();
@@ -164,6 +215,30 @@ const LessonsManagement = () => {
     } catch (e) {
       setError(e.response?.data?.error || e.message);
     }
+  };
+
+  // Quiz form handlers
+  const updateQuizQuestion = (idx, patch) => {
+    setQuizForm(f => {
+      const next = { ...f, questions: [...f.questions] };
+      next.questions[idx] = { ...next.questions[idx], ...patch };
+      return next;
+    });
+  };
+  const updateQuizOption = (qIdx, optIdx, value) => {
+    setQuizForm(f => {
+      const qs = [...f.questions];
+      const q = { ...qs[qIdx], options: [...qs[qIdx].options] };
+      q.options[optIdx] = value;
+      qs[qIdx] = q;
+      return { ...f, questions: qs };
+    });
+  };
+  const addQuizQuestion = () => {
+    setQuizForm(f => ({ ...f, questions: [...f.questions, { questionText: '', options: ['', '', '', ''], correctIndex: 0 }] }));
+  };
+  const removeQuizQuestion = (idx) => {
+    setQuizForm(f => ({ ...f, questions: f.questions.filter((_, i) => i !== idx) }));
   };
 
   const handleDelete = async (lessonId) => {
@@ -404,6 +479,131 @@ const LessonsManagement = () => {
               }
               label="Xuất bản ngay"
             />
+
+            {editingLesson && (
+              <Box>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" gutterBottom>Quiz liên quan</Typography>
+                {attachedQuizzes.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">Chưa có quiz gắn với bài học này.</Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {attachedQuizzes.map(q => (
+                      <Paper key={q.quiz_id} sx={{ p:1.5, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <Box>
+                          <Typography fontWeight={600}>{q.title}</Typography>
+                          <Typography variant="caption" color="text.secondary">ID: {q.quiz_id} • Thời lượng: {q.time_limit || 0} phút • {q.difficulty || '—'}</Typography>
+                        </Box>
+                        <Button size="small" variant="outlined" onClick={()=> window.open('/admin/quizzes', '_blank')}>Quản lý Quiz</Button>
+                      </Paper>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            )}
+
+            {/* Attached Quiz Section */}
+            <Divider sx={{ my: 2 }} />
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="h6">Tạo quiz đi kèm (tùy chọn)</Typography>
+              <FormControlLabel
+                control={<Switch checked={createQuiz} onChange={(e)=> setCreateQuiz(e.target.checked)} />}
+                label={createQuiz ? 'Có' : 'Không'}
+              />
+            </Stack>
+            {createQuiz && (
+              <Box sx={{ p:2, border: '1px solid #eee', borderRadius: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Tiêu đề Quiz"
+                      fullWidth
+                      value={quizForm.title}
+                      onChange={(e)=> setQuizForm({ ...quizForm, title: e.target.value })}
+                      placeholder={`Quiz: ${formData.title}`}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Thời lượng (phút)"
+                      fullWidth
+                      type="number"
+                      value={quizForm.timeLimit}
+                      onChange={(e)=> setQuizForm({ ...quizForm, timeLimit: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Mô tả Quiz"
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      value={quizForm.description}
+                      onChange={(e)=> setQuizForm({ ...quizForm, description: e.target.value })}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Độ khó</InputLabel>
+                      <Select
+                        value={quizForm.difficulty}
+                        label="Độ khó"
+                        onChange={(e)=> setQuizForm({ ...quizForm, difficulty: e.target.value })}
+                      >
+                        <MenuItem value="Cơ bản">Cơ bản</MenuItem>
+                        <MenuItem value="Trung bình">Trung bình</MenuItem>
+                        <MenuItem value="Nâng cao">Nâng cao</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+
+                <Typography variant="subtitle1" sx={{ mt:2, mb:1 }}>Câu hỏi</Typography>
+                <Stack spacing={2}>
+                  {quizForm.questions.map((q, qi) => (
+                    <Paper key={qi} variant="outlined" sx={{ p:2 }}>
+                      <Stack spacing={1}>
+                        <TextField
+                          label={`Câu hỏi ${qi+1}`}
+                          fullWidth
+                          value={q.questionText}
+                          onChange={(e)=> updateQuizQuestion(qi, { questionText: e.target.value })}
+                        />
+                        <Grid container spacing={1}>
+                          {q.options.map((opt, oi) => (
+                            <Grid item xs={12} sm={6} key={oi}>
+                              <TextField
+                                size="small"
+                                label={`Đáp án ${oi+1}`}
+                                fullWidth
+                                value={opt}
+                                onChange={(e)=> updateQuizOption(qi, oi, e.target.value)}
+                              />
+                            </Grid>
+                          ))}
+                        </Grid>
+                        <FormControl fullWidth size="small" sx={{ mt:1 }}>
+                          <InputLabel>Đáp án đúng</InputLabel>
+                          <Select
+                            value={q.correctIndex}
+                            label="Đáp án đúng"
+                            onChange={(e)=> updateQuizQuestion(qi, { correctIndex: Number(e.target.value) })}
+                          >
+                            {q.options.map((_, oi) => (
+                              <MenuItem key={oi} value={oi}>{`Đáp án ${oi+1}`}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Stack direction="row" spacing={1} justifyContent="space-between" sx={{ mt:1 }}>
+                          <Button color="error" onClick={()=> removeQuizQuestion(qi)} disabled={quizForm.questions.length <= 1}>Xóa câu hỏi</Button>
+                          <Button onClick={addQuizQuestion}>Thêm câu hỏi</Button>
+                        </Stack>
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -413,6 +613,8 @@ const LessonsManagement = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Inline Quiz Builder inside Dialog Content (inserted above actions) */}
     </Container>
   );
 };

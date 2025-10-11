@@ -48,7 +48,7 @@ const QuizzesManagement = () => {
         quizManagementService.list(),
         lessonService.list()
       ]);
-      setQuizzes(quizRes.data || []);
+  setQuizzes(quizRes.data || []);
       setLessons(lessonRes.data || []);
     } catch (e) {
       setError('Không thể tải dữ liệu: ' + e.message);
@@ -230,8 +230,8 @@ const QuizzesManagement = () => {
               </TableRow>
             ) : (
               quizzes.map((quiz) => (
-                <TableRow key={quiz.question_id} hover>
-                  <TableCell>{quiz.question_id}</TableCell>
+                <TableRow key={quiz.quiz_id} hover>
+                  <TableCell>{quiz.quiz_id}</TableCell>
                   <TableCell><strong>{quiz.title}</strong></TableCell>
                   <TableCell>
                     {quiz.lesson_id ? (
@@ -244,7 +244,7 @@ const QuizzesManagement = () => {
                   <TableCell>{new Date(quiz.created_at).toLocaleDateString('vi-VN')}</TableCell>
                   <TableCell align="center">
                     <Tooltip title="Xóa">
-                      <IconButton color="error" onClick={() => handleDelete(quiz.question_id)}>
+                      <IconButton color="error" onClick={() => handleDelete(quiz.quiz_id)}>
                         <DeleteIcon />
                       </IconButton>
                     </Tooltip>

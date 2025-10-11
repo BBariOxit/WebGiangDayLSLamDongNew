@@ -118,13 +118,14 @@ const Lessons = () => {
             instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
             duration: lesson.duration || '25 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
-            rating: parseFloat(lesson.rating) || 0,
+            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
             students: lesson.students_count || 0,
             progress: 0,
             category: lesson.category || 'Lịch sử địa phương',
             tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
             status: lesson.status || 'Chưa học',
-            images: parsedImages
+            images: parsedImages,
+            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
           };
         });
         console.log('Mapped lessons:', lessonsFromAPI);

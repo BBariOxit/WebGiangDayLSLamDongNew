@@ -9,7 +9,8 @@ import {
 
 function ensureCanEdit(user) {
   if (!user) throw new Error('Unauthorized');
-  if (!['Admin', 'Teacher'].includes(user.roleName || user.role)) throw new Error('Forbidden');
+  const role = (user.roleName || user.role || '').toLowerCase();
+  if (!['admin', 'teacher'].includes(role)) throw new Error('Forbidden');
 }
 
 export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty }, user) {
@@ -40,7 +41,8 @@ export async function updateQuizSvc(quizId, { title, description, lessonId, time
   if (!existing) throw new Error('Not found');
   
   const createdBy = existing.created_by;
-  if (user.role !== 'Admin' && createdBy !== user.id) throw new Error('Forbidden');
+  const role = (user.role || '').toLowerCase();
+  if (role !== 'admin' && createdBy !== user.id) throw new Error('Forbidden');
   
   await updateQuizMetadata(quizId, { title, description, lessonId: lessonId || null, difficulty, timeLimit });
   
@@ -57,7 +59,8 @@ export async function deleteQuizSvc(quizId, user) {
   if (!existing) throw new Error('Not found');
   
   const createdBy = existing.created_by;
-  if (user.role !== 'Admin' && createdBy !== user.id) throw new Error('Forbidden');
+  const role = (user.role || '').toLowerCase();
+  if (role !== 'admin' && createdBy !== user.id) throw new Error('Forbidden');
   
   await deleteQuizAndQuestions(quizId);
   return { success: true };
@@ -67,7 +70,7 @@ export async function listQuizzesSvc(params, user) {
   // Admin sees all, Teacher sees own quizzes
   const filters = { ...params };
   
-  if (user && user.role === 'Teacher') {
+  if (user && (user.role || '').toLowerCase() === 'teacher') {
     filters.createdBy = user.id;
   }
   
@@ -79,7 +82,7 @@ export async function getQuizDetailSvc(quizId, user) {
   if (!quiz) throw new Error('Not found');
   
   // Admin and creator can see, students can see if published lesson or standalone
-  if (user && (user.role === 'Admin' || quiz.created_by === user.id)) {
+  if (user && ((user.role || '').toLowerCase() === 'admin' || quiz.created_by === user.id)) {
     return quiz;
   }
   
