@@ -577,7 +577,7 @@ const Lessons = () => {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         display: '-webkit-box',
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical'
                       }}>
                         {lesson.title}
@@ -587,7 +587,7 @@ const Lessons = () => {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         display: '-webkit-box',
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical'
                       }}>
                         {lesson.summary}
