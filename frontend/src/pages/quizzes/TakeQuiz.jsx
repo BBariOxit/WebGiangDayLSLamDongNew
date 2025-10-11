@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { quizService } from '../../shared/services/quizService';
 import { useAuth } from '@features/auth/hooks/useAuth';
+import { quizApi } from '../../api/quizApi';
 import { Box, Container, Paper, Typography, LinearProgress, RadioGroup, FormControlLabel, Radio, Button, Chip } from '@mui/material';
 import { Timer as TimerIcon } from '@mui/icons-material';
 
@@ -13,12 +13,42 @@ const TakeQuiz = () => {
   const [index, setIndex] = React.useState(0);
   const [answers, setAnswers] = React.useState({});
   const [timeLeft, setTimeLeft] = React.useState(0);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
 
   React.useEffect(() => {
-    const q = quizService.getQuizById(id);
-    if (!q) return;
-    setQuiz(q);
-    setTimeLeft(q.timeLimit * 60);
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        // Load quiz meta (public) to get lesson_id and title
+        const meta = await quizApi.getPublicQuizById(id);
+        if (!meta) throw new Error('Không tìm thấy quiz');
+        // Load questions by lesson
+        const bundle = await quizApi.getQuizByLesson(meta.lesson_id);
+        const q = {
+          id: meta.quiz_id,
+          title: meta.title,
+          description: meta.description,
+          timeLimit: meta.time_limit || 10,
+          lessonId: meta.lesson_id,
+          questions: (bundle?.questions || []).map((b, idx) => ({
+            id: b.questionId || b.question_id,
+            text: b.questionText || b.question_text,
+            options: b.options || []
+          }))
+        };
+        if (mounted) {
+          setQuiz(q);
+          setTimeLeft(q.timeLimit * 60);
+        }
+      } catch (e) {
+        if (mounted) setError(e.message || 'Lỗi tải quiz');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [id]);
 
   React.useEffect(() => {
@@ -27,11 +57,21 @@ const TakeQuiz = () => {
     return () => clearTimeout(t);
   }, [timeLeft]);
 
-  if (!quiz) {
+  if (loading) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
         <Paper sx={{ p:3 }}>
-          <Typography>Không tìm thấy quiz.</Typography>
+          <Typography>Đang tải quiz...</Typography>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (!quiz || error) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 6 }}>
+        <Paper sx={{ p:3 }}>
+          <Typography>{error || 'Không tìm thấy quiz.'}</Typography>
         </Paper>
       </Container>
     );
@@ -40,18 +80,18 @@ const TakeQuiz = () => {
   const q = quiz.questions[index];
   const progress = ((index + 1) / quiz.questions.length) * 100;
 
-  const submit = () => {
-    const correct = quiz.questions.reduce((acc, qq) => acc + (answers[qq.id] === qq.correctIndex ? 1 : 0), 0);
-    const score = Math.round((correct / quiz.questions.length) * 100);
-    const durationSeconds = quiz.timeLimit * 60 - timeLeft;
-    const attempt = quizService.saveAttempt({
-      userId: user?.id || 'guest',
-      quizId: quiz.id,
-      score,
-      durationSeconds,
-      answers
-    });
-    navigate(`/quizzes/results/${attempt.id}`);
+  const submit = async () => {
+    // Build answers payload: [{ questionId, selectedAnswers: [index] }]
+    const payloadAnswers = quiz.questions.map(qq => ({
+      questionId: Number(qq.id),
+      selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
+    }));
+    try {
+      const result = await quizApi.submitAttempt(quiz.lessonId, payloadAnswers);
+      navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
+    } catch (e) {
+      setError(e.message || 'Nộp bài thất bại');
+    }
   };
 
   const format = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;

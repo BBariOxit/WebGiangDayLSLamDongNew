@@ -12,17 +12,17 @@ const createQuizSchema = Joi.object({
   title: Joi.string().min(3).max(255).required(),
   description: Joi.string().allow('', null),
   lessonId: Joi.number().integer().allow(null),
+  difficulty: Joi.string().allow('', null),
+  timeLimit: Joi.number().integer().min(1).allow(null),
   questions: Joi.array().items(
     Joi.object({
       questionText: Joi.string().required(),
-      questionType: Joi.string().valid('multiple_choice', 'true_false').default('multiple_choice'),
-      points: Joi.number().integer().min(1).default(1),
+      options: Joi.array().items(Joi.string().min(1)).min(2),
+      correctIndex: Joi.number().integer().min(0),
+      // Back-compat: allow answers[]
       answers: Joi.array().items(
-        Joi.object({
-          answerText: Joi.string().required(),
-          isCorrect: Joi.boolean().required()
-        })
-      ).min(2).required()
+        Joi.object({ answerText: Joi.string().required(), isCorrect: Joi.boolean().required() })
+      )
     })
   ).min(1).required()
 });

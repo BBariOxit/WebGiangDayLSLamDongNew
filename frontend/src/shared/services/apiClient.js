@@ -26,29 +26,77 @@ apiClient.interceptors.request.use(
 );
 
 // Response interceptor - handle errors globally
+let isRefreshing = false;
+let pendingQueue = [];
+
+function processQueue(error, token = null) {
+  pendingQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  pendingQueue = [];
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Handle 401 Unauthorized
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+    const status = error.response?.status;
+
+    // Attempt refresh on 401 once
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      if (isRefreshing) {
+        // queue the request until refresh completes
+        try {
+          const newToken = await new Promise((resolve, reject) => {
+            pendingQueue.push({ resolve, reject });
+          });
+          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+          return apiClient(originalRequest);
+        } catch (e) {
+          return Promise.reject(e);
+        }
+      }
+
+      isRefreshing = true;
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) throw new Error('No refresh token');
+        const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+        if (!res.data?.success) throw new Error('Refresh failed');
+        const { accessToken, refreshToken: newRefresh, user } = res.data.data;
+        localStorage.setItem('authToken', accessToken);
+        if (newRefresh) localStorage.setItem('refreshToken', newRefresh);
+        if (user) localStorage.setItem('user', JSON.stringify(user));
+        processQueue(null, accessToken);
+        // retry original
+        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+        return apiClient(originalRequest);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
+        // Clear and redirect to login
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshErr);
+      } finally {
+        isRefreshing = false;
       }
     }
-    
-    // Handle 403 Forbidden
-    if (error.response?.status === 403) {
+
+    if (status === 403) {
       console.error('Access denied');
     }
-    
-    // Handle 500 Server Error
-    if (error.response?.status >= 500) {
+    if (status >= 500) {
       console.error('Server error:', error.response?.data?.message || 'Internal server error');
     }
-    
     return Promise.reject(error);
   }
 );

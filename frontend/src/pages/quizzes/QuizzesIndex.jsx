@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { quizService } from '../../shared/services/quizService';
+import { quizApi } from '../../api/quizApi';
 import {
   Box, Grid, Card, CardContent, Typography, Button, Chip, Paper, InputAdornment, TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
@@ -10,6 +10,9 @@ const QuizzesIndex = () => {
   const navigate = useNavigate();
   const [search, setSearch] = React.useState('');
   const [difficulty, setDifficulty] = React.useState('');
+  const [quizzes, setQuizzes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
 
   const getDifficultyTheme = (level) => {
     // Subtle palette with a soft tint background per difficulty
@@ -25,19 +28,32 @@ const QuizzesIndex = () => {
     }
   };
 
-  const quizzes = useMemo(() => {
-    // All quizzes including lesson-attached
-    return quizService.getQuizzes();
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await quizApi.listPublicQuizzes();
+        if (mounted) setQuizzes(data);
+      } catch (e) {
+        if (mounted) setError(e.message || 'Không tải được danh sách quiz');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
   const filtered = useMemo(() => {
-    return quizzes.filter(q => {
-      const matchesSearch = q.title.toLowerCase().includes(search.toLowerCase()) || q.description.toLowerCase().includes(search.toLowerCase());
+    return (quizzes || []).filter(q => {
+      const title = (q.title || '').toLowerCase();
+      const desc = (q.description || '').toLowerCase();
+      const matchesSearch = title.includes(search.toLowerCase()) || desc.includes(search.toLowerCase());
       const matchesDiff = !difficulty || q.difficulty === difficulty;
       return matchesSearch && matchesDiff;
     });
   }, [quizzes, search, difficulty]);
 
-  const stats = quizService.getGlobalStats();
+  // Optional: could fetch stats from backend later
 
   return (
     <Box>
@@ -64,12 +80,17 @@ const QuizzesIndex = () => {
         </Grid>
       </Grid>
 
+      {loading && (
+        <Paper sx={{ p:2, mb:2 }}>Đang tải...</Paper>
+      )}
+      {error && (
+        <Paper sx={{ p:2, mb:2, color:'error.main' }}>{error}</Paper>
+      )}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {filtered.map(q => {
-          const s = quizService.getQuizStats(q.id);
           const theme = getDifficultyTheme(q.difficulty);
           return (
-            <Grid key={q.id} item xs={12} sm={6} lg={4}>
+            <Grid key={q.quiz_id} item xs={12} sm={6} lg={4}>
               <Card
                 sx={{
                   height:'100%',
@@ -95,18 +116,14 @@ const QuizzesIndex = () => {
                 <CardContent sx={{ flexGrow:1 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb:2 }}>{q.description}</Typography>
                   <Box sx={{ display:'flex', gap:1, mb:2, flexWrap: 'wrap' }}>
-                    <Chip size="small" icon={<HelpIcon/>} label={`${q.questions?.length||0} câu hỏi`} sx={{ bgcolor: '#eaf3ff', color: '#1976d2', fontWeight: 600 }} />
-                    <Chip size="small" icon={<TimerIcon/>} label={`${q.timeLimit} phút`} sx={{ bgcolor: '#fff4e5', color: '#ed6c02', fontWeight: 600 }} />
+                    <Chip size="small" icon={<HelpIcon/>} label={`Quiz`} sx={{ bgcolor: '#eaf3ff', color: '#1976d2', fontWeight: 600 }} />
+                    <Chip size="small" icon={<TimerIcon/>} label={`${q.time_limit || 0} phút`} sx={{ bgcolor: '#fff4e5', color: '#ed6c02', fontWeight: 600 }} />
                     <Chip size="small" label={q.difficulty} sx={{ bgcolor: theme.tintBg, color: theme.color, border: `1px solid ${theme.border}`, fontWeight: 700 }} />
                   </Box>
-                  <Box sx={{ display:'flex', gap:1, flexWrap:'wrap' }}>
-                    <Chip size="small" label={`Lượt làm: ${s.totalAttempts}`} sx={{ bgcolor: '#f6f7f9', color: 'text.secondary' }} />
-                    <Chip size="small" label={`TB: ${s.averageScore}%`} sx={{ bgcolor: '#f9f5e7', color: '#8d6e63' }} />
-                    <Chip size="small" label={`Đạt: ${s.passRate}%`} sx={{ bgcolor: '#eef7f0', color: '#2e7d32' }} />
-                  </Box>
+                  <Box sx={{ display:'flex', gap:1, flexWrap:'wrap' }}></Box>
                 </CardContent>
                 <Box sx={{ p:2, display:'flex', justifyContent:'flex-end' }}>
-                  <Button variant="contained" onClick={()=>navigate(`/quizzes/take/${q.id}`)}>
+                  <Button variant="contained" onClick={()=>navigate(`/quizzes/take/${q.quiz_id}`)}>
                     Bắt đầu
                   </Button>
                 </Box>

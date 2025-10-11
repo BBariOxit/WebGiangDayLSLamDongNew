@@ -1,4 +1,4 @@
-# 📚 HƯỚNG DẪN SỬ DỤNG HỆ THỐNG GIẢNG DẠY LỊCH SỬ LÂM ĐỒNG
+![alt text](image.png)# 📚 HƯỚNG DẪN SỬ DỤNG HỆ THỐNG GIẢNG DẠY LỊCH SỬ LÂM ĐỒNG
 
 ## 🚀 KHỞI ĐỘNG HỆ THỐNG
 

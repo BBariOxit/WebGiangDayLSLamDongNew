@@ -1,70 +1,56 @@
-import { query } from '../../../config/pool.js';
+import { query, getPool } from '../../../config/pool.js';
 
-export async function createQuizWithQuestions({ title, description, lessonId, createdBy, questions }) {
-  const client = await query.connect?.() || null;
+export async function createQuizWithQuestions({ title, description, lessonId, createdBy, questions, timeLimit = null, difficulty = null }) {
+  const client = await getPool().connect();
   try {
-    if (client) await client.query('BEGIN');
-    
-    // Create main quiz question (parent) - will hold metadata
-    const firstQ = await query(`
-      INSERT INTO quiz_questions (title, description, lesson_id, created_by, question_text, question_type, points)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING question_id
-    `, [title, description, lessonId, createdBy, questions[0].questionText, questions[0].questionType, questions[0].points]);
-    
-    const parentId = firstQ.rows[0].question_id;
-    
-    // Insert answers for first question
-    for (const ans of questions[0].answers) {
-      await query(`INSERT INTO quiz_answers (question_id, answer_text, is_correct) VALUES ($1,$2,$3)`,
-        [parentId, ans.answerText, ans.isCorrect]);
-    }
-    
-    // Insert remaining questions (if any)
-    for (let i = 1; i < questions.length; i++) {
-      const q = questions[i];
-      const qRes = await query(`
-        INSERT INTO quiz_questions (title, description, lesson_id, created_by, question_text, question_type, points)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING question_id
-      `, [title, description, lessonId, createdBy, q.questionText, q.questionType, q.points]);
-      
-      const qid = qRes.rows[0].question_id;
-      for (const ans of q.answers) {
-        await query(`INSERT INTO quiz_answers (question_id, answer_text, is_correct) VALUES ($1,$2,$3)`,
-          [qid, ans.answerText, ans.isCorrect]);
+    await client.query('BEGIN');
+    // Create quiz
+    const qz = await client.query(`
+      INSERT INTO quizzes (lesson_id, title, description, difficulty, time_limit, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6) RETURNING quiz_id
+    `, [lessonId || null, title, description || null, difficulty || null, timeLimit || null, createdBy || null]);
+    const quizId = qz.rows[0].quiz_id;
+    // Insert questions
+    let position = 1;
+    for (const q of questions) {
+      const opts = q.options || (q.answers ? q.answers.map(a=>a.answerText) : []);
+      let correctIndex = q.correctIndex;
+      if (correctIndex === undefined && q.answers) {
+        correctIndex = q.answers.findIndex(a => a.isCorrect);
       }
+      await client.query(`
+        INSERT INTO quiz_questions (quiz_id, question_text, options, correct_index, explanation, position)
+        VALUES ($1,$2,$3,$4,$5,$6)
+      `, [quizId, q.questionText, opts, correctIndex, q.explanation || null, position++]);
     }
-    
-    if (client) await client.query('COMMIT');
-    return { questionId: parentId };
+    await client.query('COMMIT');
+    return { quizId };
   } catch (e) {
-    if (client) await client.query('ROLLBACK');
+    await client.query('ROLLBACK');
     throw e;
   } finally {
-    if (client) client.release();
+    client.release();
   }
 }
 
-export async function getQuizById(questionId) {
+export async function getQuizById(quizId) {
   const r = await query(`
-    SELECT question_id, title, description, lesson_id, created_by, created_at
-    FROM quiz_questions
-    WHERE question_id = $1
+    SELECT quiz_id, title, description, lesson_id, created_by, created_at, difficulty, time_limit
+    FROM quizzes
+    WHERE quiz_id = $1
     LIMIT 1
-  `, [questionId]);
+  `, [quizId]);
   return r.rows[0] || null;
 }
 
 export async function listQuizzes({ createdBy, lessonId, standalone }) {
   let sql = `
-    SELECT DISTINCT q.question_id, q.title, q.description, q.lesson_id, q.created_by, q.created_at,
-      u.full_name as creator_name,
-      l.title as lesson_title
-    FROM quiz_questions q
+    SELECT q.quiz_id, q.title, q.description, q.lesson_id, q.created_by, q.created_at, q.difficulty, q.time_limit,
+           u.full_name as creator_name, l.title as lesson_title
+    FROM quizzes q
     LEFT JOIN users u ON u.user_id = q.created_by
     LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
-    WHERE q.title IS NOT NULL
+    WHERE 1=1
   `;
   const params = [];
   let idx = 1;
@@ -89,66 +75,29 @@ export async function listQuizzes({ createdBy, lessonId, standalone }) {
   return r.rows;
 }
 
-export async function getQuizWithQuestions(questionId) {
-  // Get quiz metadata
+export async function getQuizWithQuestions(quizId) {
   const quizMeta = await query(`
-    SELECT question_id, title, description, lesson_id, created_by, created_at
-    FROM quiz_questions
-    WHERE question_id = $1
-  `, [questionId]);
-  
+    SELECT quiz_id, title, description, lesson_id, created_by, created_at, difficulty, time_limit
+    FROM quizzes WHERE quiz_id=$1
+  `, [quizId]);
   if (!quizMeta.rows[0]) return null;
-  
   const quiz = quizMeta.rows[0];
-  
-  // Get all questions with same title (grouped quiz)
   const questions = await query(`
-    SELECT qq.question_id, qq.question_text, qq.question_type, qq.points
-    FROM quiz_questions qq
-    WHERE (qq.question_id = $1 OR (qq.title = $2 AND qq.title IS NOT NULL))
-    ORDER BY qq.question_id
-  `, [questionId, quiz.title]);
-  
-  // Get answers for each question
-  for (const q of questions.rows) {
-    const answers = await query(`
-      SELECT answer_id, answer_text, is_correct
-      FROM quiz_answers
-      WHERE question_id = $1
-      ORDER BY answer_id
-    `, [q.question_id]);
-    q.answers = answers.rows;
-  }
-  
-  return {
-    ...quiz,
-    questions: questions.rows
-  };
+    SELECT question_id, question_text, options, correct_index, explanation, position
+    FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id
+  `, [quizId]);
+  return { ...quiz, questions: questions.rows };
 }
 
-export async function deleteQuizAndQuestions(questionId) {
-  // Get title to delete all related questions
-  const quiz = await getQuizById(questionId);
-  if (!quiz) throw new Error('Not found');
-  
-  if (quiz.title) {
-    // Delete all questions with same title
-    await query(`DELETE FROM quiz_questions WHERE title = $1`, [quiz.title]);
-  } else {
-    await query(`DELETE FROM quiz_questions WHERE question_id = $1`, [questionId]);
-  }
+export async function deleteQuizAndQuestions(quizId) {
+  await query(`DELETE FROM quiz_questions WHERE quiz_id = $1`, [quizId]);
+  await query(`DELETE FROM quizzes WHERE quiz_id = $1`, [quizId]);
 }
 
-export async function updateQuizMetadata(questionId, { title, description, lessonId }) {
-  const quiz = await getQuizById(questionId);
-  if (!quiz) throw new Error('Not found');
-  
-  const oldTitle = quiz.title;
-  
-  // Update all questions with old title
+export async function updateQuizMetadata(quizId, { title, description, lessonId, difficulty, timeLimit }) {
   await query(`
-    UPDATE quiz_questions
-    SET title = $1, description = $2, lesson_id = $3
-    WHERE title = $4 OR question_id = $5
-  `, [title, description, lessonId, oldTitle, questionId]);
+    UPDATE quizzes
+    SET title=$1, description=$2, lesson_id=$3, difficulty=$4, time_limit=$5, updated_at=NOW()
+    WHERE quiz_id=$6
+  `, [title, description, lessonId || null, difficulty || null, timeLimit || null, quizId]);
 }
