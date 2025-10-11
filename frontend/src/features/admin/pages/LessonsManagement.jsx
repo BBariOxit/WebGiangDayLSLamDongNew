@@ -12,6 +12,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import { lessonService, quizManagementService } from '../../../shared/services/managementService';
+import apiClient from '../../../shared/services/apiClient';
 import Divider from '@mui/material/Divider';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -35,6 +36,7 @@ const LessonsManagement = () => {
   });
   const [tagInput, setTagInput] = useState('');
   const [imageInput, setImageInput] = useState({ url: '', caption: '' });
+  const fileInputRef = React.useRef(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [attachedQuizzes, setAttachedQuizzes] = useState([]);
@@ -163,6 +165,29 @@ const LessonsManagement = () => {
         images: [...formData.images, { url: imageInput.url.trim(), caption: imageInput.caption.trim() }] 
       });
       setImageInput({ url: '', caption: '' });
+    }
+  };
+
+  const handlePickImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = res.data?.data?.url;
+      if (url) {
+        setFormData(prev => ({ ...prev, images: [...prev.images, { url, caption: '' }] }));
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Tải ảnh thất bại');
+    } finally {
+      // reset
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -457,7 +482,11 @@ const LessonsManagement = () => {
                   onChange={(e) => setImageInput({ ...imageInput, caption: e.target.value })}
                   fullWidth
                 />
-                <Button variant="outlined" onClick={handleAddImage} fullWidth>Thêm hình ảnh</Button>
+                <Stack direction="row" spacing={1}>
+                  <Button variant="outlined" onClick={handleAddImage} fullWidth>Thêm bằng URL</Button>
+                  <Button variant="contained" color="secondary" onClick={handlePickImage} fullWidth>Chọn từ máy</Button>
+                  <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+                </Stack>
               </Stack>
             </Box>
 

@@ -58,3 +58,25 @@ export async function listQuizAttempts(quizId, userId) {
   const r = await query('SELECT * FROM quiz_attempts WHERE quiz_id=$1 AND user_id=$2 ORDER BY attempt_id DESC LIMIT 20', [quizId, userId]);
   return r.rows;
 }
+
+// BOOKMARKS
+export async function addBookmark(lessonId, userId) {
+  await query('INSERT INTO lesson_bookmarks (lesson_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [lessonId, userId]);
+  return { lesson_id: lessonId, user_id: userId };
+}
+
+export async function removeBookmark(lessonId, userId) {
+  const r = await query('DELETE FROM lesson_bookmarks WHERE lesson_id=$1 AND user_id=$2 RETURNING *', [lessonId, userId]);
+  return r.rows[0] || null;
+}
+
+export async function listBookmarks(userId) {
+  const r = await query(`
+    SELECT lb.lesson_id, l.title, l.slug, l.summary, l.images, l.created_at
+    FROM lesson_bookmarks lb
+    JOIN lessons l ON l.lesson_id = lb.lesson_id
+    WHERE lb.user_id=$1
+    ORDER BY lb.created_at DESC
+  `, [userId]);
+  return r.rows;
+}

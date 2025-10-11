@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useAuth } from '@features/auth/hooks/useAuth';
+import { listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lessonEngagementApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -140,7 +141,18 @@ const Lessons = () => {
     };
 
     fetchLessons();
-  }, []);
+    // Load bookmarks if logged in
+    (async () => {
+      try {
+        if (!user) return;
+        const items = await listMyBookmarks();
+        const setIds = new Set(items.map(i => i.lesson_id));
+        setBookmarkedLessons(setIds);
+      } catch (e) {
+        // ignore silently
+      }
+    })();
+  }, [user]);
 
   // Filter and search logic
   useEffect(() => {
@@ -226,15 +238,22 @@ const Lessons = () => {
     return 'success';
   };
 
-  const handleBookmark = (lessonId, event) => {
+  const handleBookmark = async (lessonId, event) => {
     event.stopPropagation();
     const newBookmarked = new Set(bookmarkedLessons);
-    if (newBookmarked.has(lessonId)) {
-      newBookmarked.delete(lessonId);
-    } else {
-      newBookmarked.add(lessonId);
-    }
+    const currently = newBookmarked.has(lessonId);
+    // optimistic
+    if (currently) newBookmarked.delete(lessonId); else newBookmarked.add(lessonId);
     setBookmarkedLessons(newBookmarked);
+    try {
+      if (!user) return; // guest: local only
+      if (currently) await removeBookmarkApi(lessonId); else await addBookmarkApi(lessonId);
+    } catch (e) {
+      // revert on error
+      if (currently) newBookmarked.add(lessonId); else newBookmarked.delete(lessonId);
+      setBookmarkedLessons(newBookmarked);
+      setError('Không thể cập nhật danh sách đã lưu');
+    }
   };
 
   const handleLessonClick = (lesson) => {
@@ -552,7 +571,7 @@ const Lessons = () => {
                       )}
                     </Box>
 
-                    <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                    <CardContent sx={{ flexGrow: 1, p: 3, display: 'flex', flexDirection: 'column' }}>
                       <Typography variant="h6" component="h2" gutterBottom sx={{
                         fontWeight: 'bold',
                         overflow: 'hidden',
@@ -629,6 +648,9 @@ const Lessons = () => {
                           </Tooltip>
                         )}
                       </Box>
+
+                      {/* Spacer pushes the button to the bottom while content above can grow */}
+                      <Box sx={{ flexGrow: 1 }} />
 
                       <Button
                         fullWidth

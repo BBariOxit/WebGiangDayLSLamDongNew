@@ -1,4 +1,4 @@
-import { createComment, listComments, deleteComment, upsertProgress, getProgress, getRatingSummary, getQuizByLesson, listQuizQuestions, recordQuizAttempt, listQuizAttempts } from '../repositories/lessonEngagementRepo.js';
+import { createComment, listComments, deleteComment, upsertProgress, getProgress, getRatingSummary, getQuizByLesson, listQuizQuestions, recordQuizAttempt, listQuizAttempts, addBookmark, removeBookmark, listBookmarks } from '../repositories/lessonEngagementRepo.js';
 
 export async function addCommentSvc(lessonId, user, { content, rating }) {
   if (!user) throw new Error('Unauthorized');
@@ -49,3 +49,8 @@ export async function listAttemptsSvc(quizId, user) {
   if (!user) throw new Error('Unauthorized');
   return listQuizAttempts(quizId, user.id);
 }
+
+// BOOKMARKS
+export async function addBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); return addBookmark(lessonId, user.id); }
+export async function removeBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); const r = await removeBookmark(lessonId, user.id); if(!r) throw new Error('Not found'); return { success: true }; }
+export async function listBookmarksSvc(user){ if(!user) throw new Error('Unauthorized'); return listBookmarks(user.id); }

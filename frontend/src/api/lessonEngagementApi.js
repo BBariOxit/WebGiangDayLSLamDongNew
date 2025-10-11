@@ -48,3 +48,17 @@ export async function listQuizAttempts(lessonId) {
   const res = await apiClient.get(`/lessons/${lessonId}/quiz-attempts`);
   return res.data?.data || [];
 }
+
+// BOOKMARKS
+export async function listMyBookmarks(){
+  const res = await apiClient.get('/lessons/me/bookmarks');
+  return res.data?.data || [];
+}
+export async function addBookmarkApi(lessonId){
+  const res = await apiClient.post(`/lessons/${lessonId}/bookmark`);
+  return res.data?.data || null;
+}
+export async function removeBookmarkApi(lessonId){
+  const res = await apiClient.delete(`/lessons/${lessonId}/bookmark`);
+  return res.data?.data || null;
+}
