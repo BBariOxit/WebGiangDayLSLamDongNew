@@ -46,6 +46,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import quizService from '../shared/services/quizService';
+import { resolveAssetUrl } from '../shared/utils/url';
 import { quizApi } from '../api/quizApi';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
@@ -83,7 +84,7 @@ const LessonDetail = () => {
           return;
         }
         
-        // Parse images safely
+        // Parse images safely and normalize to [{ url, caption }]
         let parsedImages = [];
         if (lessonData.images) {
           if (Array.isArray(lessonData.images)) {
@@ -97,6 +98,9 @@ const LessonDetail = () => {
           } else if (typeof lessonData.images === 'object') {
             parsedImages = lessonData.images;
           }
+        }
+        if (Array.isArray(parsedImages)) {
+          parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
         }
         
         const mappedLesson = {
@@ -627,7 +631,7 @@ const LessonDetail = () => {
                     <Box
                       sx={{
                         height: 250,
-                        backgroundImage: `url(${image.url})`,
+                        backgroundImage: `url(${resolveAssetUrl(image.url)})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         position: 'relative',

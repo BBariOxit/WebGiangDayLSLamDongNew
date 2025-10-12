@@ -43,6 +43,7 @@ import {
   Lock
 } from '@mui/icons-material';
 import axios from 'axios';
+import { resolveAssetUrl } from '../shared/utils/url';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import { listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lessonEngagementApi';
 
@@ -93,21 +94,19 @@ const Lessons = () => {
         const lessonsFromAPI = payload.map(lesson => {
           console.log('Processing lesson:', lesson.lesson_id, lesson.title);
 
-          // Parse images safely
+          // Parse images safely and normalize to [{ url, caption }]
           let parsedImages = [];
           if (lesson.images) {
             if (Array.isArray(lesson.images)) {
               parsedImages = lesson.images;
             } else if (typeof lesson.images === 'string') {
-              try {
-                parsedImages = JSON.parse(lesson.images);
-              } catch (e) {
-                console.warn('Failed to parse images for lesson', lesson.lesson_id, e);
-              }
+              try { parsedImages = JSON.parse(lesson.images); } catch (e) { console.warn('Failed to parse images for lesson', lesson.lesson_id, e); }
             } else if (typeof lesson.images === 'object') {
-              // Already parsed by PostgreSQL driver
               parsedImages = lesson.images;
             }
+          }
+          if (Array.isArray(parsedImages)) {
+            parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
           }
 
           return {
@@ -519,7 +518,7 @@ const Lessons = () => {
                     <Box sx={{ position: 'relative', height: 200, overflow: 'hidden' }}>
                       {lesson.images && lesson.images.length > 0 ? (
                         <Box component="img"
-                          src={lesson.images[0].url}
+                          src={resolveAssetUrl(lesson.images[0].url)}
                           alt={lesson.title}
                           sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       ) : (

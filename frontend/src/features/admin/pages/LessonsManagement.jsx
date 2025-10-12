@@ -14,6 +14,7 @@ import {
 import { lessonService, quizManagementService } from '../../../shared/services/managementService';
 import apiClient from '../../../shared/services/apiClient';
 import Divider from '@mui/material/Divider';
+import { resolveAssetUrl } from '../../../shared/utils/url';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -35,7 +36,7 @@ const LessonsManagement = () => {
     images: []
   });
   const [tagInput, setTagInput] = useState('');
-  const [imageInput, setImageInput] = useState({ url: '', caption: '' });
+  // Image picking uses upload only; URL input removed
   const fileInputRef = React.useRef(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -90,8 +91,7 @@ const LessonsManagement = () => {
       timeLimit: 10,
       questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }]
     });
-    setTagInput('');
-    setImageInput({ url: '', caption: '' });
+  setTagInput('');
     setOpenDialog(true);
   };
 
@@ -118,8 +118,7 @@ const LessonsManagement = () => {
         const qres = await quizManagementService.list({ lessonId: data.lesson_id });
         setAttachedQuizzes(qres.data || []);
       } catch {}
-      setTagInput('');
-      setImageInput({ url: '', caption: '' });
+  setTagInput('');
       setOpenDialog(true);
     } catch (e) {
       setError('Không thể tải bài học: ' + e.message);
@@ -141,10 +140,9 @@ const LessonsManagement = () => {
       tags: [],
       images: []
     });
-    setCreateQuiz(false);
-    setQuizForm({ title: '', description: '', difficulty: 'Cơ bản', timeLimit: 10, questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }] });
-    setTagInput('');
-    setImageInput({ url: '', caption: '' });
+  setCreateQuiz(false);
+  setQuizForm({ title: '', description: '', difficulty: 'Cơ bản', timeLimit: 10, questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }] });
+  setTagInput('');
   };
 
   const handleAddTag = () => {
@@ -158,15 +156,7 @@ const LessonsManagement = () => {
     setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
   };
 
-  const handleAddImage = () => {
-    if (imageInput.url.trim()) {
-      setFormData({ 
-        ...formData, 
-        images: [...formData.images, { url: imageInput.url.trim(), caption: imageInput.caption.trim() }] 
-      });
-      setImageInput({ url: '', caption: '' });
-    }
-  };
+  // Removed URL-based add image
 
   const handlePickImage = () => {
     fileInputRef.current?.click();
@@ -456,10 +446,18 @@ const LessonsManagement = () => {
               <Typography variant="subtitle2" mb={1}>Hình ảnh</Typography>
               <Stack spacing={2} mb={2}>
                 {formData.images.map((img, index) => (
-                  <Paper key={index} sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 400 }}>{img.url}</Typography>
-                      {img.caption && <Typography variant="caption" color="text.secondary">{img.caption}</Typography>}
+                  <Paper key={index} sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box component="img" src={resolveAssetUrl(img.url)} alt={`image-${index}`} sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, border: '1px solid #eee' }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ display:'block' }}>{img.url}</Typography>
+                      <TextField
+                        size="small"
+                        placeholder="Chú thích (tùy chọn)"
+                        value={img.caption || ''}
+                        onChange={(e)=> setFormData(prev => { const arr=[...prev.images]; arr[index] = { ...arr[index], caption: e.target.value }; return { ...prev, images: arr }; })}
+                        fullWidth
+                        sx={{ mt: 1 }}
+                      />
                     </Box>
                     <IconButton size="small" color="error" onClick={() => handleRemoveImage(index)}>
                       <CloseIcon />
@@ -468,25 +466,8 @@ const LessonsManagement = () => {
                 ))}
               </Stack>
               <Stack spacing={1}>
-                <TextField
-                  size="small"
-                  placeholder="URL hình ảnh..."
-                  value={imageInput.url}
-                  onChange={(e) => setImageInput({ ...imageInput, url: e.target.value })}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  placeholder="Chú thích (tùy chọn)..."
-                  value={imageInput.caption}
-                  onChange={(e) => setImageInput({ ...imageInput, caption: e.target.value })}
-                  fullWidth
-                />
-                <Stack direction="row" spacing={1}>
-                  <Button variant="outlined" onClick={handleAddImage} fullWidth>Thêm bằng URL</Button>
-                  <Button variant="contained" color="secondary" onClick={handlePickImage} fullWidth>Chọn từ máy</Button>
-                  <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
-                </Stack>
+                <Button variant="contained" color="secondary" onClick={handlePickImage} sx={{ alignSelf:'flex-start' }}>Chọn từ máy</Button>
+                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
               </Stack>
             </Box>
 
