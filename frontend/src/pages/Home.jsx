@@ -31,24 +31,83 @@ import {
   Login,
   PersonAdd
 } from '@mui/icons-material';
-import { lessonsData } from '../data/lessonsData';
+import apiClient from '../shared/services/apiClient';
+import { resolveAssetUrl } from '../shared/utils/url';
 import { useAuth } from '@features/auth/hooks/useAuth';
 
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [lessons, setLessons] = React.useState([]);
+  const [featuredLessons, setFeaturedLessons] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
 
-  const featuredLessons = lessonsData.slice(0, 3);
+  // Fetch lessons from API and compute featured
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.get('/lessons?published=1');
+        const payload = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const normalized = (payload || []).map((lesson) => {
+          // Normalize images to [{url, caption}]
+          let parsedImages = [];
+          if (lesson.images) {
+            if (Array.isArray(lesson.images)) parsedImages = lesson.images;
+            else if (typeof lesson.images === 'string') {
+              try { parsedImages = JSON.parse(lesson.images); } catch {}
+            } else if (typeof lesson.images === 'object') parsedImages = lesson.images;
+          }
+          if (Array.isArray(parsedImages)) parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
+          return {
+            id: lesson.lesson_id,
+            slug: lesson.slug,
+            title: lesson.title,
+            summary: lesson.summary || '',
+            duration: lesson.duration || '25 phút',
+            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
+            students: lesson.students_count || 0,
+            difficulty: lesson.difficulty || 'Cơ bản',
+            category: lesson.category || 'Lịch sử địa phương',
+            images: parsedImages,
+            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
+          };
+        });
+        if (!mounted) return;
+        setLessons(normalized);
+        // Choose featured: prioritize known landmarks if present, else by students desc then rating desc
+        const prioritySlugs = ['lien-khuong', 'da-lat', 'djiring', 'di-linh', 'djiring-di-linh'];
+        const withPriority = [...normalized].sort((a, b) => {
+          const ap = prioritySlugs.some(s => (a.slug || '').includes(s)) ? 1 : 0;
+          const bp = prioritySlugs.some(s => (b.slug || '').includes(s)) ? 1 : 0;
+          if (ap !== bp) return bp - ap; // prioritized first
+          if (b.students !== a.students) return (b.students || 0) - (a.students || 0);
+          if (b.rating !== a.rating) return (b.rating || 0) - (a.rating || 0);
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        setFeaturedLessons(withPriority.slice(0, 3));
+      } catch (e) {
+        if (mounted) setError(e.message || 'Không thể tải dữ liệu');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
-  // Calculate more realistic stats
-  const totalMinutes = lessonsData.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
-  const totalStudents = lessonsData.reduce((sum, lesson) => sum + lesson.students, 0);
-  const averageRating = (lessonsData.reduce((sum, lesson) => sum + lesson.rating, 0) / lessonsData.length).toFixed(1);
-
+  // Compute stats from DB data
+  const totalMinutes = lessons.reduce((sum, l) => {
+    const m = String(l.duration).match(/\d+/);
+    return sum + (m ? parseInt(m[0], 10) : 0);
+  }, 0);
+  const totalStudents = lessons.reduce((sum, l) => sum + (l.students || 0), 0);
+  const averageRating = lessons.length ? (lessons.reduce((s, l) => s + (l.rating || 0), 0) / lessons.length).toFixed(1) : '0.0';
   const stats = [
-    { icon: MenuBook, label: 'Bài học', value: lessonsData.length, color: '#2196f3' },
+    { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#2196f3' },
     { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },
-    { icon: People, label: 'Lượt xem', value: `${Math.round(totalStudents/100)*100}+`, color: '#4caf50' },
+    { icon: People, label: 'Lượt xem', value: `${Math.max(0, Math.round(totalStudents/10)*10)}+`, color: '#4caf50' },
     { icon: EmojiEvents, label: 'Đánh giá', value: `${averageRating}/5⭐`, color: '#ff9800' }
   ];
 
@@ -71,14 +130,13 @@ const Home = () => {
                 fontWeight: 'bold',
                 textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
               }}>
-                Khám phá Lâm Đồng mới
+                Khám phá Lâm Đồng
               </Typography>
               <Typography variant="h5" paragraph sx={{
                 opacity: 0.9,
                 lineHeight: 1.6
               }}>
-                Hành trình tìm hiểu lịch sử, văn hóa và địa lý của tỉnh Lâm Đồng mới 
-                sau cuộc sát nhập lịch sử năm 2025
+                Hành trình tìm hiểu lịch sử, văn hóa và địa lý của tỉnh Lâm Đồng qua những bài học trực quan và sinh động.
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
                 {user ? (
@@ -230,7 +288,7 @@ const Home = () => {
               Bài học nổi bật
             </Typography>
             <Typography variant="h6" color="text.secondary">
-              Khám phá những bài học hấp dẫn về Lâm Đồng mới
+              Khám phá những bài học hấp dẫn về Lâm Đồng
             </Typography>
           </Box>
 
@@ -247,31 +305,27 @@ const Home = () => {
                     boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
                   }
                 }}>
-                  <CardMedia
-                    sx={{
-                      height: 200,
-                      background: `linear-gradient(135deg, 
-                        ${index % 3 === 0 ? '#ff6b6b, #ee5a52' : 
-                          index % 3 === 1 ? '#4ecdc4, #44a08d' : 
-                          '#45b7d1, #96c93d'})`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative'
-                    }}
-                  >
-                    <Typography
-                      variant="h4"
-                      sx={{
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textAlign: 'center',
-                        textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
-                      }}
-                    >
-                      {lesson.category}
-                    </Typography>
-                    
+                  <Box sx={{ position: 'relative' }}>
+                    {lesson.images && lesson.images.length > 0 ? (
+                      <Box component="img"
+                        src={resolveAssetUrl(lesson.images[0].url)}
+                        alt={lesson.title}
+                        sx={{ width: '100%', height: 200, objectFit: 'cover', display: 'block' }}
+                      />
+                    ) : (
+                      <Box sx={{
+                        height: 200,
+                        background: `linear-gradient(135deg, 
+                          ${index % 3 === 0 ? '#ff6b6b, #ee5a52' : 
+                            index % 3 === 1 ? '#4ecdc4, #44a08d' : 
+                            '#45b7d1, #96c93d'})`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
+                          {lesson.category}
+                        </Typography>
+                      </Box>
+                    )}
                     <Fab 
                       color="primary" 
                       sx={{ 
@@ -281,16 +335,13 @@ const Home = () => {
                         bgcolor: 'white',
                         color: 'primary.main',
                         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                        '&:hover': {
-                          bgcolor: 'primary.main',
-                          color: 'white'
-                        }
+                        '&:hover': { bgcolor: 'primary.main', color: 'white' }
                       }}
                       onClick={() => navigate(`/lesson/${lesson.slug}`)}
                     >
                       <PlayArrow />
                     </Fab>
-                  </CardMedia>
+                  </Box>
 
                   <CardContent sx={{ p: 3, pt: 4 }}>
                     <Typography variant="h6" component="h3" gutterBottom sx={{
@@ -340,7 +391,7 @@ const Home = () => {
                         variant="outlined"
                       />
                       <Typography variant="caption" color="text.secondary">
-                        {lesson.instructor.split(' ').slice(-2).join(' ')}
+                        Lâm Đồng
                       </Typography>
                     </Box>
                   </CardContent>
@@ -451,7 +502,7 @@ const Home = () => {
             Sẵn sàng bắt đầu hành trình học tập?
           </Typography>
           <Typography variant="h6" paragraph sx={{ opacity: 0.9 }}>
-            Tham gia cùng hàng trăm học viên đã khám phá vẻ đẹp của Lâm Đồng mới
+            Tham gia cùng hàng trăm học viên đã khám phá vẻ đẹp của Lâm Đồng
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 4 }}>
             {!user && (

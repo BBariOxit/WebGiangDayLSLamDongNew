@@ -307,10 +307,10 @@ const Lessons = () => {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent'
         }}>
-          Bài học về Lâm Đồng mới
+          Bài học về Lâm Đồng
         </Typography>
         <Typography variant="h6" color="text.secondary" paragraph>
-          Khám phá kiến thức về lịch sử, văn hóa và địa lý của tỉnh Lâm Đồng mới
+          Khám phá kiến thức về lịch sử, văn hóa và địa lý của tỉnh Lâm Đồng
         </Typography>
       </Box>
 

@@ -186,7 +186,7 @@ const Dashboard = () => {
                   lineHeight: 1.6,
                   fontSize: { xs: '1rem', md: '1.25rem' }
                 }}>
-                  Khám phá lịch sử phong phú của tỉnh Lâm Đồng mới - nơi giao thoa văn hóa 
+                  Khám phá lịch sử phong phú của tỉnh Lâm Đồng - nơi giao thoa văn hóa 
                   của ba vùng đất Lâm Đồng, Bình Thuận và Đắk Nông
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

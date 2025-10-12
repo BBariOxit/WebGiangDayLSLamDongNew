@@ -18,6 +18,7 @@ import AppLayout from '../../shared/layouts/AppLayout';
 import TeacherQuizzes from '../../pages/teacher/TeacherQuizzes';
 import AdminQuizzes from '../../pages/admin/AdminQuizzes';
 import AdminCreateQuiz from '../../pages/admin/AdminCreateQuiz';
+import Analytics from '../../pages/Analytics';
 
 // Management pages
 import LessonsManagement from '../../features/admin/pages/LessonsManagement';
@@ -173,6 +174,15 @@ const AppRoutes = () => {
               <Dashboard />
             </ProtectedRoute>
           } 
+        />
+
+        <Route 
+          path="/analytics" 
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
         />
         
         {/* Legacy single lesson quiz path remains for backward compatibility */}
