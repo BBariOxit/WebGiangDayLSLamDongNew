@@ -21,18 +21,18 @@ const TakeQuiz = () => {
     (async () => {
       try {
         setLoading(true);
-        // Load quiz meta (public) to get lesson_id and title
+        // Load quiz meta (public)
         const meta = await quizApi.getPublicQuizById(id);
         if (!meta) throw new Error('Không tìm thấy quiz');
-        // Load questions by lesson
-        const bundle = await quizApi.getQuizByLesson(meta.lesson_id);
+        // Load questions by quizId directly
+        const bundle = await quizApi.getQuizQuestionsByQuizId(id);
         const q = {
           id: meta.quiz_id,
           title: meta.title,
           description: meta.description,
           timeLimit: meta.time_limit || 10,
           lessonId: meta.lesson_id,
-          questions: (bundle?.questions || []).map((b, idx) => ({
+          questions: (bundle?.questions || []).map(b => ({
             id: b.questionId || b.question_id,
             text: b.questionText || b.question_text,
             options: b.options || []
@@ -87,7 +87,7 @@ const TakeQuiz = () => {
       selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
     }));
     try {
-      const result = await quizApi.submitAttempt(quiz.lessonId, payloadAnswers);
+      const result = await quizApi.submitAttemptByQuizId(quiz.id, payloadAnswers);
       navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
     } catch (e) {
       setError(e.message || 'Nộp bài thất bại');

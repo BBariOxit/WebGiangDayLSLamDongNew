@@ -46,6 +46,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import quizService from '../shared/services/quizService';
+import { quizApi } from '../api/quizApi';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
 import { fetchRatingSummary } from '../api/lessonEngagementApi.js';
@@ -63,6 +64,8 @@ const LessonDetail = () => {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [quizDialog, setQuizDialog] = useState(false);
   const [lessonQuiz, setLessonQuiz] = useState(null);
+  const [quizzesForLesson, setQuizzesForLesson] = useState([]);
+  const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [ratingSummary, setRatingSummary] = useState({ avg_rating: 0, rating_count: 0 });
 
@@ -118,9 +121,29 @@ const LessonDetail = () => {
         setIsBookmarked(Math.random() > 0.5);
         setCompleted(mappedLesson.progress === 100);
         
-        // Load quiz mapped by lessonId
-  const q = await quizService.getQuizByLessonId(mappedLesson.id);
-  setLessonQuiz(q || null);
+        // Load quizzes for this lesson (list)
+        try {
+          const list = await quizApi.listPublicQuizzes({ lessonId: mappedLesson.id });
+          setQuizzesForLesson(list);
+          if (list && list.length > 0) {
+            setSelectedQuizId(String(list[0].quiz_id));
+            // also fetch the first quiz's question count via by-id endpoint for dialog info
+            try {
+              const bundle = await quizApi.getQuizQuestionsByQuizId(list[0].quiz_id);
+              setLessonQuiz({ id: list[0].quiz_id, questions: bundle?.questions || [], timeLimit: list[0].time_limit, title: list[0].title });
+            } catch {}
+          } else {
+            // Fallback legacy single-quiz-by-lesson
+            const q = await quizService.getQuizByLessonId(mappedLesson.id);
+            setLessonQuiz(q || null);
+            if (q?.id) setSelectedQuizId(String(q.id));
+          }
+        } catch (e) {
+          console.warn('Load quizzes list failed', e);
+          const q = await quizService.getQuizByLessonId(mappedLesson.id);
+          setLessonQuiz(q || null);
+          if (q?.id) setSelectedQuizId(String(q.id));
+        }
 
         try {
           const rs = await fetchRatingSummary(mappedLesson.id);
@@ -201,13 +224,13 @@ const LessonDetail = () => {
   };
 
   const handleQuizNavigate = () => {
-    if (!lessonQuiz) {
+    if (!selectedQuizId) {
       alert('Bài học này chưa có quiz.');
       setQuizDialog(false);
       return;
     }
     // Navigate to standardized take quiz route
-    navigate(`/quizzes/take/${lessonQuiz.id}`);
+    navigate(`/quizzes/take/${selectedQuizId}`);
     setQuizDialog(false);
   };
 
@@ -400,7 +423,7 @@ const LessonDetail = () => {
                   variant="filled"
                 />
               )}
-              {lessonQuiz ? (
+              {(quizzesForLesson?.length > 0 || lessonQuiz) ? (
                 <Button
                   variant="contained"
                   startIcon={<Quiz />}
@@ -702,7 +725,20 @@ const LessonDetail = () => {
           <Typography variant="body1" paragraph>
             Bạn có muốn làm bài quiz để kiểm tra kiến thức đã học không?
           </Typography>
-          {lessonQuiz ? (
+          {quizzesForLesson && quizzesForLesson.length > 1 ? (
+            <Box sx={{ textAlign:'left' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb:1 }}>
+                Chọn một quiz để bắt đầu:
+              </Typography>
+              <Box>
+                {quizzesForLesson.map(q => (
+                  <Button key={q.quiz_id} variant={String(selectedQuizId)===String(q.quiz_id)?'contained':'outlined'} sx={{ mr:1, mb:1 }} onClick={()=> setSelectedQuizId(String(q.quiz_id))}>
+                    {q.title}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+          ) : lessonQuiz ? (
             <Typography variant="body2" color="text.secondary">
               Bài quiz gồm {lessonQuiz.questions?.length || 0} câu hỏi{lessonQuiz.timeLimit && ` với thời gian ${lessonQuiz.timeLimit} phút`}.
             </Typography>
@@ -716,7 +752,7 @@ const LessonDetail = () => {
           <Button onClick={handleQuizClose} variant="outlined">
             Để sau
           </Button>
-          {lessonQuiz && (
+          {selectedQuizId && (
             <Button onClick={handleQuizNavigate} variant="contained" autoFocus>
               Bắt đầu ngay
             </Button>

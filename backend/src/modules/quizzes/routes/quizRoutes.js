@@ -75,9 +75,28 @@ router.get('/public/:id', async (req, res) => {
   }
 });
 
+// New: standalone quiz by quizId (questions without answers) - place BEFORE ':lessonId'
+router.get('/by-id/:quizId', async (req, res) => {
+  try {
+    const { getQuizByQuizIdSvc } = await import('../services/quizService.js');
+    const quizId = parseInt(req.params.quizId, 10);
+    const data = await getQuizByQuizIdSvc(quizId);
+    res.json({ success: true, data });
+  } catch (e) { res.status(404).json({ success: false, error: e.message }); }
+});
+router.post('/by-id/:quizId/submit', verifyAccess, async (req, res) => {
+  try {
+    const { submitAttemptByQuizIdSvc } = await import('../services/quizService.js');
+    const quizId = parseInt(req.params.quizId, 10);
+    const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+    const data = await submitAttemptByQuizIdSvc(quizId, req.user.id, answers);
+    res.json({ success: true, data });
+  } catch (e) { res.status(400).json({ success: false, error: e.message }); }
+});
+
 // Public/student routes (existing)
-router.get('/:lessonId', getQuiz); // Get quiz questions (for a lesson)
-router.post('/:lessonId/submit', verifyAccess, submitQuizAttempt); // Submit quiz attempt
-router.get('/:lessonId/attempts', verifyAccess, getUserAttempts); // Get user's quiz attempts
+router.get('/:lessonId', getQuiz); // legacy: first quiz of lesson
+router.post('/:lessonId/submit', verifyAccess, submitQuizAttempt); // legacy submit by lesson
+router.get('/:lessonId/attempts', verifyAccess, getUserAttempts); // attempts by lesson
 
 export default router;
