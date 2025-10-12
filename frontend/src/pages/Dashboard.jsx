@@ -19,7 +19,8 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import { lessonsData } from '../data/lessonsData';
+import apiClient from '../shared/services/apiClient';
+import { resolveAssetUrl } from '../shared/utils/url';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import {
   TrendingUp as TrendingUpIcon,
@@ -45,48 +46,115 @@ const Dashboard = () => {
   const { user } = useAuth();
   const theme = useTheme();
   const [animatedStats, setAnimatedStats] = useState([0, 0, 0, 0]);
+  const [targetStats, setTargetStats] = useState([0, 0, 0, 0]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
+  const [lessons, setLessons] = useState([]);
+  const [featured, setFeatured] = useState([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  // Fetch lessons and analytics (public)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const [resLessons, resAnalytics] = await Promise.all([
+          apiClient.get('/lessons?published=1'),
+          apiClient.get('/analytics/public').catch(() => ({ data: { data: null } }))
+        ]);
+        const payload = Array.isArray(resLessons.data) ? resLessons.data : resLessons.data?.data || [];
+        const normalized = (payload || []).map((lesson) => {
+          let parsedImages = [];
+          if (lesson.images) {
+            if (Array.isArray(lesson.images)) parsedImages = lesson.images;
+            else if (typeof lesson.images === 'string') { try { parsedImages = JSON.parse(lesson.images); } catch {} }
+            else if (typeof lesson.images === 'object') parsedImages = lesson.images;
+          }
+          if (Array.isArray(parsedImages)) parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
+          return {
+            id: lesson.lesson_id,
+            slug: lesson.slug,
+            title: lesson.title,
+            summary: lesson.summary || '',
+            instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
+            duration: lesson.duration || '25 phút',
+            difficulty: lesson.difficulty || 'Cơ bản',
+            category: lesson.category || 'Lịch sử địa phương',
+            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
+            students: lesson.students_count || 0,
+            progress: 0,
+            images: parsedImages,
+            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
+          };
+        });
+        if (!mounted) return;
+        setLessons(normalized);
 
-  // Calculate real stats from lessons data
-  const totalLessons = lessonsData.length;
-  const totalVideoMinutes = lessonsData.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
-  const totalQuizzes = lessonsData.reduce((sum, lesson) => sum + (lesson.quizQuestions ? lesson.quizQuestions.length : 5), 0);
-  const averageRating = Math.round(lessonsData.reduce((sum, lesson) => sum + lesson.rating, 0) / lessonsData.length * 10) / 10;
+        const prioritySlugs = ['lien-khuong', 'da-lat', 'djiring', 'di-linh', 'djiring-di-linh'];
+        const featuredSorted = [...normalized].sort((a, b) => {
+          const ap = prioritySlugs.some(s => (a.slug || '').includes(s)) ? 1 : 0;
+          const bp = prioritySlugs.some(s => (b.slug || '').includes(s)) ? 1 : 0;
+          if (ap !== bp) return bp - ap;
+          if ((b.students || 0) !== (a.students || 0)) return (b.students || 0) - (a.students || 0);
+          if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+        setFeatured(featuredSorted.slice(0, Math.max(1, Math.min(3, featuredSorted.length))));
 
-  const finalStats = [totalLessons, totalVideoMinutes, totalQuizzes, averageRating * 10];
+        const globals = resAnalytics.data?.data?.globals || null;
+        const totalLessons = globals?.total_lessons ?? normalized.length;
+        // Sum minutes from duration strings
+        const totalMinutes = normalized.reduce((sum, l) => {
+          const m = String(l.duration).match(/\d+/);
+          return sum + (m ? parseInt(m[0], 10) : 0);
+        }, 0);
+        const totalQuizzes = globals?.total_quizzes ?? 0;
+        const averageRating = globals?.avg_rating ? Number(globals.avg_rating) : (normalized.length ? (normalized.reduce((s, l) => s + (l.rating || 0), 0) / normalized.length) : 0);
+        setTargetStats([totalLessons, totalMinutes, totalQuizzes, Math.round(averageRating * 10)]);
+      } catch (e) {
+        if (mounted) setError(e.message || 'Không thể tải dữ liệu bảng điều khiển');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     setIsVisible(true);
-    const timer = setTimeout(() => {
-      finalStats.forEach((finalValue, index) => {
-        let current = 0;
-        const increment = finalValue / 50;
-        const counter = setInterval(() => {
-          current += increment;
-          if (current >= finalValue) {
-            current = finalValue;
-            clearInterval(counter);
-          }
-          setAnimatedStats(prev => {
-            const newStats = [...prev];
-            newStats[index] = Math.floor(current);
-            return newStats;
-          });
-        }, 30);
-      });
-    }, 500);
-
-    return () => clearTimeout(timer);
   }, []);
+
+  // Animate stats when target changes
+  useEffect(() => {
+    const timers = [];
+    targetStats.forEach((finalValue, index) => {
+      let current = 0;
+      const increment = finalValue / 50;
+      const counter = setInterval(() => {
+        current += increment;
+        if (current >= finalValue) {
+          current = finalValue;
+          clearInterval(counter);
+        }
+        setAnimatedStats(prev => {
+          const newStats = [...prev];
+          newStats[index] = Math.floor(current);
+          return newStats;
+        });
+      }, 30);
+      timers.push(counter);
+    });
+    return () => timers.forEach(t => clearInterval(t));
+  }, [targetStats]);
 
   useEffect(() => {
+    if (featured.length <= 1) return; // no slider needed
     const slideTimer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % lessonsData.length);
+      setCurrentSlide(prev => (prev + 1) % featured.length);
     }, 5000);
-
     return () => clearInterval(slideTimer);
-  }, []);
+  }, [featured.length]);
 
   const statsCards = [
     {
@@ -123,16 +191,17 @@ const Dashboard = () => {
     }
   ];
 
-  const handleLessonClick = (lessonId) => {
-    navigate(`/lessons/${lessonId}`);
+  const handleLessonClick = (lesson) => {
+    if (!lesson?.slug) return;
+    navigate(`/lesson/${lesson.slug}`);
   };
 
   const nextSlide = () => {
-    setCurrentSlide(prev => (prev + 1) % lessonsData.length);
+    setCurrentSlide(prev => (prev + 1) % Math.max(1, featured.length));
   };
 
   const prevSlide = () => {
-    setCurrentSlide(prev => (prev - 1 + lessonsData.length) % lessonsData.length);
+    setCurrentSlide(prev => (prev - 1 + Math.max(1, featured.length)) % Math.max(1, featured.length));
   };
 
   return (
@@ -331,7 +400,7 @@ const Dashboard = () => {
           </Box>
 
           <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: 2 }}>
-            {lessonsData.map((lesson, index) => (
+            {featured.map((lesson, index) => (
               <Fade key={lesson.id} in={index === currentSlide} timeout={1000}>
                 <Card
                   sx={{
@@ -343,7 +412,7 @@ const Dashboard = () => {
                       boxShadow: '0 12px 30px rgba(0,0,0,0.15)'
                     }
                   }}
-                  onClick={() => handleLessonClick(lesson.id)}
+                  onClick={() => handleLessonClick(lesson)}
                 >
                   <Grid container>
                     <Grid item xs={12} md={8}>
@@ -399,52 +468,64 @@ const Dashboard = () => {
                           </Typography>
                         </Box>
 
-                        <LinearProgress
-                          variant="determinate"
-                          value={lesson.progress}
-                          sx={{
-                            height: 8,
-                            borderRadius: 4,
-                            bgcolor: alpha('#1976d2', 0.1),
-                            '& .MuiLinearProgress-bar': {
-                              background: 'linear-gradient(90deg, #1976d2, #42a5f5)',
-                              borderRadius: 4
-                            },
-                            mb: 2
-                          }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          Tiến độ: {lesson.progress}%
-                        </Typography>
+                        {lesson.progress > 0 && (
+                          <>
+                            <LinearProgress
+                              variant="determinate"
+                              value={lesson.progress}
+                              sx={{
+                                height: 8,
+                                borderRadius: 4,
+                                bgcolor: alpha('#1976d2', 0.1),
+                                '& .MuiLinearProgress-bar': {
+                                  background: 'linear-gradient(90deg, #1976d2, #42a5f5)',
+                                  borderRadius: 4
+                                },
+                                mb: 2
+                              }}
+                            />
+                            <Typography variant="body2" color="text.secondary">
+                              Tiến độ: {lesson.progress}%
+                            </Typography>
+                          </>
+                        )}
                       </CardContent>
                     </Grid>
                     
                     <Grid item xs={12} md={4}>
-                      <Box
-                        sx={{
-                          height: '100%',
-                          minHeight: 300,
-                          background: `linear-gradient(135deg, ${alpha('#1976d2', 0.8)}, ${alpha('#42a5f5', 0.8)}), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><polygon fill="%23ffffff" fill-opacity="0.1" points="0,1000 1000,0 1000,1000"/></svg>')`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          position: 'relative',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
-                            animation: 'shimmer 3s ease-in-out infinite'
-                          }
-                        }}
-                      >
-                        <LibraryIcon sx={{ fontSize: 120, color: 'white', opacity: 0.8 }} />
-                      </Box>
+                      {lesson.images && lesson.images.length > 0 ? (
+                        <Box component="img"
+                          src={resolveAssetUrl(lesson.images[0].url)}
+                          alt={lesson.title}
+                          sx={{ width: '100%', height: '100%', minHeight: 300, objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            height: '100%',
+                            minHeight: 300,
+                            background: `linear-gradient(135deg, ${alpha('#1976d2', 0.8)}, ${alpha('#42a5f5', 0.8)})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative',
+                            '&::before': {
+                              content: '""',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
+                              animation: 'shimmer 3s ease-in-out infinite'
+                            }
+                          }}
+                        >
+                          <LibraryIcon sx={{ fontSize: 120, color: 'white', opacity: 0.8 }} />
+                        </Box>
+                      )}
                     </Grid>
                   </Grid>
                 </Card>
