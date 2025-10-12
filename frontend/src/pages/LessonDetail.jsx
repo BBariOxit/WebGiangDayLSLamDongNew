@@ -412,9 +412,10 @@ const LessonDetail = () => {
           {/* Rating & Progress */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Rating value={ratingSummary.avg_rating ? Number(ratingSummary.avg_rating) : 0} precision={0.1} readOnly />
+              {/* Default to 5.0 when no one has rated yet */}
+              <Rating value={(Number(ratingSummary.rating_count||0) === 0) ? 5 : (ratingSummary.avg_rating ? Number(ratingSummary.avg_rating) : 0)} precision={0.1} readOnly />
               <Typography variant="body2" color="text.secondary">
-                ({ratingSummary.avg_rating || 0}/5.0 · {ratingSummary.rating_count || 0} đánh giá)
+                ({(Number(ratingSummary.rating_count||0) === 0 ? 5 : (ratingSummary.avg_rating || 0))}/5.0 · {ratingSummary.rating_count || 0} đánh giá)
               </Typography>
             </Box>
 
@@ -675,7 +676,27 @@ const LessonDetail = () => {
         )}
 
         {/* Comment Section */}
-        <CommentSection lessonId={lesson.id} lessonTitle={lesson.title} />
+        <CommentSection
+          lessonId={lesson.id}
+          lessonTitle={lesson.title}
+          onAfterSubmit={async (payload) => {
+            // If the new comment included a rating, refresh summary
+            try {
+              if (payload?.rating) {
+                const rs = await fetchRatingSummary(lesson.id);
+                setRatingSummary(rs);
+              }
+            } catch (e) {
+              // ignore
+            }
+          }}
+          onAfterDelete={async () => {
+            try {
+              const rs = await fetchRatingSummary(lesson.id);
+              setRatingSummary(rs);
+            } catch {}
+          }}
+        />
 
         {/* Navigation to Next Lesson */}
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

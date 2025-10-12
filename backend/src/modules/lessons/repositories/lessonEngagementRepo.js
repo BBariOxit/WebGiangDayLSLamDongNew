@@ -2,13 +2,32 @@ import { query } from '../../../config/pool.js';
 
 // COMMENTS
 export async function listComments(lessonId, limit = 50, offset = 0) {
-  const r = await query('SELECT c.*, u.username FROM lesson_comments c JOIN users u ON u.user_id=c.user_id WHERE lesson_id=$1 ORDER BY comment_id DESC LIMIT $2 OFFSET $3', [lessonId, limit, offset]);
+  const sql = `
+    SELECT c.*, COALESCE(u.full_name, split_part(u.email,'@',1)) AS username
+    FROM lesson_comments c
+    JOIN users u ON u.user_id = c.user_id
+    WHERE c.lesson_id = $1
+    ORDER BY c.comment_id DESC
+    LIMIT $2 OFFSET $3
+  `;
+  const r = await query(sql, [lessonId, limit, offset]);
   return r.rows;
 }
 
 export async function createComment({ lessonId, userId, content, rating }) {
-  const r = await query('INSERT INTO lesson_comments (lesson_id, user_id, content, rating) VALUES ($1,$2,$3,$4) RETURNING *', [lessonId, userId, content, rating || null]);
-  return r.rows[0];
+  const inserted = await query(
+    'INSERT INTO lesson_comments (lesson_id, user_id, content, rating) VALUES ($1,$2,$3,$4) RETURNING comment_id',
+    [lessonId, userId, content, rating || null]
+  );
+  const id = inserted.rows[0]?.comment_id;
+  if (!id) return null;
+  const r = await query(
+    `SELECT c.*, COALESCE(u.full_name, split_part(u.email,'@',1)) AS username
+     FROM lesson_comments c JOIN users u ON u.user_id = c.user_id
+     WHERE c.comment_id = $1`,
+    [id]
+  );
+  return r.rows[0] || null;
 }
 
 export async function deleteComment(commentId, userId, isAdmin) {

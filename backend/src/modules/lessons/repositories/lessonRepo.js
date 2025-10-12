@@ -47,7 +47,15 @@ export async function listLessons({ q, publishedOnly, limit = 20, offset = 0 }) 
   if (q) { clauses.push(`(title ILIKE $${idx} OR summary ILIKE $${idx})`); params.push(`%${q}%`); idx++; }
   if (publishedOnly) { clauses.push(`is_published = true`); }
   const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
-  const sql = `SELECT * FROM lessons ${where} ORDER BY lesson_id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+  // Include rating summary (avg_rating, rating_count) via materialized view when available
+  const sql = `
+    SELECT l.*, rs.avg_rating, rs.rating_count
+    FROM lessons l
+    LEFT JOIN lesson_rating_summary rs ON rs.lesson_id = l.lesson_id
+    ${where ? where.replace(/^WHERE /, 'WHERE ') : ''}
+    ORDER BY l.lesson_id DESC
+    LIMIT $${idx} OFFSET $${idx + 1}
+  `;
   params.push(limit, offset);
   const r = await query(sql, params);
   return r.rows;

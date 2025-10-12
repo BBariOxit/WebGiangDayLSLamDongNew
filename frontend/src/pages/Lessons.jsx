@@ -109,6 +109,10 @@ const Lessons = () => {
             parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
           }
 
+          const avg = parseFloat(lesson.avg_rating ?? lesson.rating ?? 0) || 0;
+          const rcount = Number(lesson.rating_count ?? 0);
+          // Default to 5.0 stars when there are no ratings, per requirement
+          const computedRating = rcount === 0 ? 5.0 : Math.round(avg * 10) / 10;
           return {
             id: lesson.lesson_id,
             title: lesson.title,
@@ -118,14 +122,15 @@ const Lessons = () => {
             instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
             duration: lesson.duration || '25 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
-            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
+            rating: computedRating,
             students: lesson.students_count || 0,
             progress: 0,
             category: lesson.category || 'Lịch sử địa phương',
             tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
             status: lesson.status || 'Chưa học',
             images: parsedImages,
-            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
+            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString(),
+            ratingCount: rcount
           };
         });
         console.log('Mapped lessons:', lessonsFromAPI);
