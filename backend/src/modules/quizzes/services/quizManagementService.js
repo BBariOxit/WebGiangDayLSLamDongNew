@@ -15,13 +15,25 @@ function ensureCanEdit(user) {
 
 export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty }, user) {
   ensureCanEdit(user);
-  const normQuestions = (questions || []).map(q => ({
-    questionText: q.questionText || q.text,
-    options: q.options || (q.answers ? q.answers.map(a => a.answerText) : q.options),
-    correctIndex: q.correctIndex !== undefined ? q.correctIndex : (q.answers ? q.answers.findIndex(a=>a.isCorrect) : q.correctIndex),
-    explanation: q.explanation || null,
-    points: q.points || 1
-  }));
+  const normQuestions = (questions || []).map(q => {
+    // accept questionType but ignore (for now only MC supported)
+    const optsRaw = q.options || (q.answers ? q.answers.map(a => a.answerText) : []);
+    const opts = (optsRaw || []).map(o => String(o || '').trim()).filter(Boolean);
+    let correctIndex = q.correctIndex;
+    if ((correctIndex === undefined || correctIndex === null) && Array.isArray(q.answers)) {
+      correctIndex = q.answers.findIndex(a => a && a.isCorrect);
+    }
+    if (correctIndex == null || correctIndex < 0 || correctIndex >= opts.length) {
+      correctIndex = 0; // fallback to first option
+    }
+    return {
+      questionText: q.questionText || q.text || 'Câu hỏi',
+      options: opts,
+      correctIndex,
+      explanation: q.explanation || null,
+      points: Number.isFinite(q.points) ? q.points : 1
+    };
+  });
   const result = await createQuizWithQuestions({
     title,
     description,

@@ -119,8 +119,8 @@ const LessonDetail = () => {
         setCompleted(mappedLesson.progress === 100);
         
         // Load quiz mapped by lessonId
-        const q = quizService.getQuizByLessonId(mappedLesson.id);
-        setLessonQuiz(q || null);
+  const q = await quizService.getQuizByLessonId(mappedLesson.id);
+  setLessonQuiz(q || null);
 
         try {
           const rs = await fetchRatingSummary(mappedLesson.id);

@@ -89,10 +89,10 @@ const Lessons = () => {
           setFilteredLessons([]);
           return;
         }
-        
+
         const lessonsFromAPI = payload.map(lesson => {
           console.log('Processing lesson:', lesson.lesson_id, lesson.title);
-          
+
           // Parse images safely
           let parsedImages = [];
           if (lesson.images) {
@@ -109,7 +109,7 @@ const Lessons = () => {
               parsedImages = lesson.images;
             }
           }
-          
+
           return {
             id: lesson.lesson_id,
             title: lesson.title,
@@ -331,14 +331,14 @@ const Lessons = () => {
                   </InputAdornment>
                 ),
               }}
-              sx={{ 
+              sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: 2
                 }
               }}
             />
           </Grid>
-          
+
           <Grid item xs={12} sm={6} md={2}>
             <FormControl fullWidth>
               <InputLabel>Danh mục</InputLabel>
@@ -354,7 +354,7 @@ const Lessons = () => {
               </Select>
             </FormControl>
           </Grid>
-          
+
           <Grid item xs={12} sm={6} md={2}>
             <FormControl fullWidth>
               <InputLabel>Độ khó</InputLabel>
@@ -370,7 +370,7 @@ const Lessons = () => {
               </Select>
             </FormControl>
           </Grid>
-          
+
           <Grid item xs={12} md={2}>
             <FormControl fullWidth>
               <InputLabel>Sắp xếp</InputLabel>
@@ -387,7 +387,7 @@ const Lessons = () => {
               </Select>
             </FormControl>
           </Grid>
-          
+
           <Grid item xs={12} md={2}>
             <Button
               fullWidth
@@ -450,7 +450,7 @@ const Lessons = () => {
           {filteredLessons.map((lesson, index) => {
             const isLocked = !user && lesson.id > 1;
             const isBookmarked = bookmarkedLessons.has(lesson.id);
-            
+
             return (
               <Grid item xs={12} md={6} lg={4} key={lesson.id}>
                 <Fade in={true} timeout={300 + index * 100}>
@@ -519,9 +519,9 @@ const Lessons = () => {
                     <Box sx={{ position: 'relative', height: 200, overflow: 'hidden' }}>
                       {lesson.images && lesson.images.length > 0 ? (
                         <Box component="img"
-                             src={lesson.images[0].url}
-                             alt={lesson.title}
-                             sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          src={lesson.images[0].url}
+                          alt={lesson.title}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       ) : (
                         <Box sx={{
                           width: '100%',

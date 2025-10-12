@@ -10,6 +10,7 @@ export async function getQuizByLessonSvc(lessonId) {
     throw new Error('No quiz found for this lesson');
   }
 
+  const quizId = rows[0].quiz_id; // provided by repo mapping
   // rows come from quiz_questions with options (TEXT[]) and correct_index, but we must not leak correct_index
   const questions = rows.map(r => ({
     questionId: r.question_id,
@@ -18,7 +19,7 @@ export async function getQuizByLessonSvc(lessonId) {
     points: r.points || 1
   }));
 
-  return { lessonId, questions };
+  return { id: quizId, lessonId, questions };
 }
 
 export async function submitAttemptSvc(lessonId, userId, answers) {

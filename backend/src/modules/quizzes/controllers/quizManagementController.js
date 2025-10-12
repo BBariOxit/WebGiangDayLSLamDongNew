@@ -23,13 +23,13 @@ const createQuizSchema = Joi.object({
       answers: Joi.array().items(
         Joi.object({ answerText: Joi.string().required(), isCorrect: Joi.boolean().required() })
       )
-    })
+    }).unknown(true)
   ).min(1).required()
-});
+}).unknown(true);
 
 export async function createQuiz(req, res) {
   try {
-    const { error, value } = createQuizSchema.validate(req.body);
+    const { error, value } = createQuizSchema.prefs({ allowUnknown: true, stripUnknown: true }).validate(req.body);
     if (error) return fail(res, 400, error.message);
     const quiz = await createQuizSvc(value, req.user);
     created(res, quiz);
@@ -41,7 +41,7 @@ export async function createQuiz(req, res) {
 
 export async function updateQuiz(req, res) {
   try {
-    const { error, value } = createQuizSchema.validate(req.body);
+    const { error, value } = createQuizSchema.prefs({ allowUnknown: true, stripUnknown: true }).validate(req.body);
     if (error) return fail(res, 400, error.message);
     const quizId = parseInt(req.params.id, 10);
     const quiz = await updateQuizSvc(quizId, value, req.user);

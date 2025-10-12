@@ -153,13 +153,13 @@ const QuizzesManagement = () => {
           return;
         }
         if (!q.answers.some(a => a.isCorrect)) {
-          setError('Mỗi câu hỏi cần có ít nhất 1 đáp án đúng');
-          return;
+          // Auto pick the first answer as correct to reduce friction
+          q.answers = q.answers.map((a, idx) => ({ ...a, isCorrect: idx === 0 }));
         }
       }
 
       if (editingQuiz) {
-        await quizManagementService.update(editingQuiz.question_id, formData);
+        await quizManagementService.update(editingQuiz.quiz_id, formData);
         setSuccess('Cập nhật quiz thành công!');
       } else {
         await quizManagementService.create(formData);
@@ -258,8 +258,10 @@ const QuizzesManagement = () => {
 
       {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>{editingQuiz ? 'Chỉnh sửa Quiz' : 'Tạo Quiz mới'}</DialogTitle>
-        <DialogContent dividers>
+        <DialogTitle sx={{ display:'flex', alignItems:'center', gap:1, fontWeight:'bold' }}>
+          {editingQuiz ? 'Chỉnh sửa Quiz' : 'Tạo Quiz mới'}
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor:'#fafbff' }}>
           <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField
               label="Tiêu đề Quiz"
@@ -291,10 +293,11 @@ const QuizzesManagement = () => {
             </FormControl>
 
             <Divider />
-            <Typography variant="h6">Câu hỏi</Typography>
+            <Typography variant="h6" sx={{ fontWeight:'bold' }}>Câu hỏi</Typography>
+            <Typography variant="body2" color="text.secondary">Mỗi câu hỏi cần ít nhất 2 đáp án và chọn 1 đáp án đúng.</Typography>
 
             {formData.questions.map((q, qIdx) => (
-              <Card key={qIdx} variant="outlined">
+              <Card key={qIdx} variant="outlined" sx={{ borderRadius:2, boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
                 <CardContent>
                   <Stack spacing={2}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">

@@ -19,9 +19,9 @@ export async function createQuizWithQuestions({ title, description, lessonId, cr
         correctIndex = q.answers.findIndex(a => a.isCorrect);
       }
       await client.query(`
-        INSERT INTO quiz_questions (quiz_id, question_text, options, correct_index, explanation, position)
-        VALUES ($1,$2,$3,$4,$5,$6)
-      `, [quizId, q.questionText, opts, correctIndex, q.explanation || null, position++]);
+        INSERT INTO quiz_questions (quiz_id, question_text, options, correct_index, explanation, position, points)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `, [quizId, q.questionText, opts, correctIndex, q.explanation || null, position++, q.points || 1]);
     }
     await client.query('COMMIT');
     return { quizId };
