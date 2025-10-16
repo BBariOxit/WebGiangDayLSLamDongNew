@@ -15,6 +15,13 @@ const createSchema = Joi.object({
   images: Joi.array().items(Joi.object({
     url: Joi.string().required(),
     caption: Joi.string().allow('', null)
+  })).default([]),
+  sections: Joi.array().items(Joi.object({
+    type: Joi.string().valid('heading','text','image_gallery','video','embed','divider').default('text'),
+    title: Joi.string().allow('', null),
+    contentHtml: Joi.string().allow('', null),
+    data: Joi.object().default({}),
+    orderIndex: Joi.number().integer().min(0)
   })).default([])
 });
 
@@ -53,7 +60,11 @@ export async function getLessonBySlug(req, res) {
 
 export async function updateLesson(req, res) {
   try {
-    const lesson = await updateLessonSvc(parseInt(req.params.id, 10), req.body, req.user);
+    // allow optional validation of sections shape similar to create
+    const updateSchema = createSchema.fork(Object.keys(createSchema.describe().keys), (s)=> s.optional());
+    const { error, value } = updateSchema.validate(req.body);
+    if (error) return fail(res, 400, error.message);
+    const lesson = await updateLessonSvc(parseInt(req.params.id, 10), value, req.user);
     ok(res, lesson);
   } catch (e) {
     if (e.message === 'Forbidden') return forbidden(res);

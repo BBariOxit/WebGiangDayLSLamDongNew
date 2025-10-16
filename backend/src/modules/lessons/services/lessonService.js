@@ -1,5 +1,5 @@
 import slugify from 'slugify';
-import { createLesson, getLessonBySlug, getLessonById, listLessons, updateLesson, deleteLesson } from '../repositories/lessonRepo.js';
+import { createLesson, getLessonBySlug, getLessonById, listLessons, updateLesson, deleteLesson, replaceLessonSections } from '../repositories/lessonRepo.js';
 
 function ensureCanEdit(user) {
   if (!user) throw new Error('Unauthorized');
@@ -9,7 +9,7 @@ function ensureCanEdit(user) {
 
 export async function createLessonSvc(data, user) {
   ensureCanEdit(user);
-  const { title, summary, contentHtml, isPublished, instructor, duration, difficulty, category, tags, images } = data;
+  const { title, summary, contentHtml, isPublished, instructor, duration, difficulty, category, tags, images, sections } = data;
   
   let baseSlug = slugify(title, { lower: true, strict: true });
   if (!baseSlug) baseSlug = 'lesson';
@@ -33,6 +33,16 @@ export async function createLessonSvc(data, user) {
     tags,
     images
   });
+  // Insert sections if provided
+  try {
+    if (Array.isArray(sections) && sections.length) {
+      await replaceLessonSections(lesson.lesson_id, sections);
+      const refreshed = await getLessonById(lesson.lesson_id);
+      return refreshed || lesson;
+    }
+  } catch (e) {
+    // If sections fail to persist, still return the created lesson
+  }
   return lesson;
 }
 

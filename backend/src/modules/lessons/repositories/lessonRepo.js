@@ -32,12 +32,27 @@ export async function createLesson({
 
 export async function getLessonById(id) {
   const r = await query('SELECT * FROM lessons WHERE lesson_id=$1', [id]);
-  return r.rows[0] || null;
+  const lesson = r.rows[0] || null;
+  if (!lesson) return null;
+  // load sections ordered
+  try {
+    const rs = await query('SELECT * FROM lesson_sections WHERE lesson_id=$1 ORDER BY order_index ASC, section_id ASC', [id]);
+    lesson.sections = rs.rows || [];
+  } catch (e) {
+    // sections table might not exist yet; ignore
+  }
+  return lesson;
 }
 
 export async function getLessonBySlug(slug) {
   const r = await query('SELECT * FROM lessons WHERE slug=$1', [slug]);
-  return r.rows[0] || null;
+  const lesson = r.rows[0] || null;
+  if (!lesson) return null;
+  try {
+    const rs = await query('SELECT * FROM lesson_sections WHERE lesson_id=$1 ORDER BY order_index ASC, section_id ASC', [lesson.lesson_id]);
+    lesson.sections = rs.rows || [];
+  } catch (e) {}
+  return lesson;
 }
 
 export async function listLessons({ q, publishedOnly, limit = 20, offset = 0 }) {
@@ -62,7 +77,7 @@ export async function listLessons({ q, publishedOnly, limit = 20, offset = 0 }) 
 }
 
 export async function updateLesson(id, data) {
-  const { title, contentHtml, summary, isPublished, instructor, duration, difficulty, category, tags, images } = data;
+  const { title, contentHtml, summary, isPublished, instructor, duration, difficulty, category, tags, images, sections } = data;
   
   // Build dynamic update
   const sets = [];
@@ -85,10 +100,58 @@ export async function updateLesson(id, data) {
   const sql = `UPDATE lessons SET ${sets.join(', ')} WHERE lesson_id = $${idx} RETURNING *`;
   params.push(id);
   const r = await query(sql, params);
-  return r.rows[0] || null;
+  const updated = r.rows[0] || null;
+  if (!updated) return null;
+  // If sections provided, replace atomically using a transaction
+  if (Array.isArray(sections)) {
+    await upsertLessonSections(id, sections);
+  }
+  // attach sections for convenience
+  try {
+    const rs = await query('SELECT * FROM lesson_sections WHERE lesson_id=$1 ORDER BY order_index ASC, section_id ASC', [id]);
+    updated.sections = rs.rows || [];
+  } catch (e) {}
+  return updated;
 }
 
 export async function deleteLesson(id) {
   await query('DELETE FROM lessons WHERE lesson_id=$1', [id]);
   return true;
+}
+
+// Sections helpers
+export async function replaceLessonSections(lessonId, sections) {
+  // simple replace inside a transaction
+  const clientRes = await query('BEGIN');
+  try {
+    await query('DELETE FROM lesson_sections WHERE lesson_id=$1', [lessonId]);
+    for (let i = 0; i < sections.length; i++) {
+      const raw = sections[i] || {};
+      const s = {
+        type: raw.type || 'text',
+        title: raw.title || null,
+        contentHtml: raw.contentHtml !== undefined ? raw.contentHtml : raw.content_html,
+        data: raw.data || {},
+        orderIndex: Number(raw.orderIndex ?? i)
+      };
+      await query(
+        `INSERT INTO lesson_sections(lesson_id, type, title, content_html, data, order_index)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [lessonId, s.type || 'text', s.title || null, s.contentHtml || null, JSON.stringify(s.data || {}), Number(s.orderIndex ?? i)]
+      );
+    }
+    await query('COMMIT');
+  } catch (e) {
+    await query('ROLLBACK');
+    throw e;
+  }
+}
+
+async function upsertLessonSections(lessonId, sections) {
+  // if no sections length -> clear all
+  if (!Array.isArray(sections) || sections.length === 0) {
+    await query('DELETE FROM lesson_sections WHERE lesson_id=$1', [lessonId]);
+    return;
+  }
+  await replaceLessonSections(lessonId, sections);
 }

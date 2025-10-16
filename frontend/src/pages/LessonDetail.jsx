@@ -118,7 +118,8 @@ const LessonDetail = () => {
           category: lessonData.category || 'Lịch sử địa phương',
           tags: Array.isArray(lessonData.tags) ? lessonData.tags : ['Lịch sử'],
           status: lessonData.status || 'Chưa học',
-          images: parsedImages
+          images: parsedImages,
+          sections: Array.isArray(lessonData.sections) ? lessonData.sections : []
         };
         
         setLesson(mappedLesson);
@@ -458,9 +459,44 @@ const LessonDetail = () => {
 
         {/* Lesson Content */}
         <Paper elevation={2} sx={{ p: 4, borderRadius: 3 }}>
-          <Box
-            dangerouslySetInnerHTML={{ __html: lesson.description || '' }}
-            sx={{
+          {/* Render structured sections if present; fallback to legacy contentHtml */}
+          {lesson.sections && lesson.sections.length > 0 ? (
+            <Box>
+              {lesson.sections.map((s, idx) => (
+                <Box key={idx} sx={{ mb:3 }}>
+                  {s.type === 'heading' && (
+                    <Typography variant="h4" sx={{ fontWeight:'bold', color:'primary.main', mt:2 }}>
+                      {s.title}
+                    </Typography>
+                  )}
+                  {s.type === 'text' && (
+                    <Box dangerouslySetInnerHTML={{ __html: s.content_html || s.contentHtml || '' }} />
+                  )}
+                  {s.type === 'image_gallery' && Array.isArray(s.data?.images) && s.data.images.length > 0 && (
+                    <Grid container spacing={2}>
+                      {s.data.images.map((img, i) => (
+                        <Grid item xs={12} sm={6} key={i}>
+                          <Card>
+                            <Box component="img" src={resolveAssetUrl(img.url)} alt={img.caption||''} sx={{ width:'100%', height:240, objectFit:'cover' }} />
+                            {img.caption && (<CardContent><Typography variant="body2">{img.caption}</Typography></CardContent>)}
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  )}
+                  {s.type === 'video' && s.data?.url && (
+                    <Box sx={{ position:'relative', paddingTop:'56.25%' }}>
+                      <Box component="iframe" src={s.data.url} title={s.title||`video-${idx}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen sx={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0 }} />
+                    </Box>
+                  )}
+                  {s.type === 'divider' && (<Divider sx={{ my:2 }} />)}
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Box
+              dangerouslySetInnerHTML={{ __html: lesson.description || '' }}
+              sx={{
               '& .lesson-content': {
                 '& h1, & h2, & h3, & h4': {
                   color: 'primary.main',
@@ -597,7 +633,8 @@ const LessonDetail = () => {
                 }
               }
             }}
-          />
+            />
+          )}
         </Paper>
 
         {/* Image Gallery */}

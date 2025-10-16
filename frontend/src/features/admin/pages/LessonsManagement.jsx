@@ -9,7 +9,14 @@ import {
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
   Visibility as VisibilityIcon, Article as ArticleIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Title as TitleIcon,
+  TextFields as TextIcon,
+  Image as ImageIcon,
+  VideoLibrary as VideoIcon,
+  HorizontalRule as DividerIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon
 } from '@mui/icons-material';
 import { lessonService, quizManagementService } from '../../../shared/services/managementService';
 import apiClient from '../../../shared/services/apiClient';
@@ -33,7 +40,8 @@ const LessonsManagement = () => {
     difficulty: 'Cơ bản',
     category: '',
     tags: [],
-    images: []
+    images: [],
+    sections: []
   });
   const [tagInput, setTagInput] = useState('');
   // Image picking uses upload only; URL input removed
@@ -41,6 +49,7 @@ const LessonsManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [attachedQuizzes, setAttachedQuizzes] = useState([]);
+  const [sectionUploadIndex, setSectionUploadIndex] = useState(null);
   // Create attached quiz toggles and form
   const [createQuiz, setCreateQuiz] = useState(false);
   const [quizForm, setQuizForm] = useState({
@@ -81,7 +90,8 @@ const LessonsManagement = () => {
       difficulty: 'Cơ bản',
       category: 'Lịch sử địa phương',
       tags: [],
-      images: []
+      images: [],
+      sections: []
     });
     setCreateQuiz(false);
     setQuizForm({
@@ -111,7 +121,8 @@ const LessonsManagement = () => {
         category: data.category || 'Lịch sử địa phương',
         tags: Array.isArray(data.tags) ? data.tags : [],
         images: Array.isArray(data.images) ? data.images : 
-                (typeof data.images === 'string' ? JSON.parse(data.images) : [])
+    (typeof data.images === 'string' ? JSON.parse(data.images) : []),
+  sections: Array.isArray(data.sections) ? data.sections : []
       });
       // Optionally: fetch attached quizzes for this lesson to show quick info
       try {
@@ -138,7 +149,8 @@ const LessonsManagement = () => {
       difficulty: 'Cơ bản',
       category: '',
       tags: [],
-      images: []
+      images: [],
+      sections: []
     });
   setCreateQuiz(false);
   setQuizForm({ title: '', description: '', difficulty: 'Cơ bản', timeLimit: 10, questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }] });
@@ -171,7 +183,18 @@ const LessonsManagement = () => {
       const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
       const url = res.data?.data?.url;
       if (url) {
-        setFormData(prev => ({ ...prev, images: [...prev.images, { url, caption: '' }] }));
+        if (sectionUploadIndex !== null && sectionUploadIndex !== undefined) {
+          setFormData(prev => {
+            const arr = [...prev.sections];
+            const imgs = [...(arr[sectionUploadIndex]?.data?.images || [])];
+            imgs.push({ url, caption: '' });
+            arr[sectionUploadIndex] = { ...arr[sectionUploadIndex], data: { ...(arr[sectionUploadIndex].data || {}), images: imgs } };
+            return { ...prev, sections: arr };
+          });
+          setSectionUploadIndex(null);
+        } else {
+          setFormData(prev => ({ ...prev, images: [...prev.images, { url, caption: '' }] }));
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Tải ảnh thất bại');
@@ -479,6 +502,67 @@ const LessonsManagement = () => {
                 onChange={(content) => setFormData({ ...formData, contentHtml: content })}
                 style={{ height: '300px', marginBottom: '60px' }}
               />
+            </Box>
+
+            {/* Sections Builder */}
+            <Divider sx={{ my: 2 }} />
+            <Box>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="h6">Các mục (Sections)</Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button variant="outlined" size="small" startIcon={<TitleIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'heading', title:'Tiêu đề chương', orderIndex:p.sections.length }] }))}>Tiêu đề</Button>
+                  <Button variant="outlined" size="small" startIcon={<TextIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'text', contentHtml:'<p>Nội dung...</p>', orderIndex:p.sections.length }] }))}>Đoạn văn</Button>
+                  <Button variant="outlined" size="small" startIcon={<ImageIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'image_gallery', data:{ images:[] }, orderIndex:p.sections.length }] }))}>Thư viện ảnh</Button>
+                  <Button variant="outlined" size="small" startIcon={<VideoIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'video', data:{ url:'' }, orderIndex:p.sections.length }] }))}>Video</Button>
+                  <Button variant="outlined" size="small" startIcon={<DividerIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'divider', orderIndex:p.sections.length }] }))}>Ngăn cách</Button>
+                </Stack>
+              </Stack>
+
+              {formData.sections.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">Chưa có mục nào. Hãy thêm mục để cấu trúc bài học theo chương/phần.</Typography>
+              ) : (
+                <Stack spacing={2}>
+                  {formData.sections.map((s, idx) => (
+                    <Paper key={idx} variant="outlined" sx={{ p:2 }}>
+                      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                        <Typography fontWeight={600}>#{idx+1} · {s.type}</Typography>
+                        <Stack direction="row" spacing={1}>
+                          <IconButton size="small" disabled={idx===0} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; return { ...p, sections: arr.map((x,i)=> ({ ...x, orderIndex:i })) }; })}><ArrowUpIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" disabled={idx===formData.sections.length-1} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; return { ...p, sections: arr.map((x,i)=> ({ ...x, orderIndex:i })) }; })}><ArrowDownIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" color="error" onClick={()=> setFormData(p=> ({ ...p, sections: p.sections.filter((_,i)=> i!==idx).map((x,i)=> ({ ...x, orderIndex:i })) }))}><CloseIcon fontSize="small" /></IconButton>
+                        </Stack>
+                      </Stack>
+
+                      {s.type === 'heading' && (
+                        <TextField fullWidth label="Tiêu đề" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
+                      )}
+
+                      {s.type === 'text' && (
+                        <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 180, marginTop: 8 }} />
+                      )}
+
+                      {s.type === 'image_gallery' && (
+                        <Box>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb:1 }}>Thêm ảnh cho thư viện</Typography>
+                          <Stack direction="row" spacing={1} flexWrap="wrap">
+                            {(s.data?.images||[]).map((img, ii) => (
+                              <Box key={ii} sx={{ position:'relative', mr:1, mb:1 }}>
+                                <Box component="img" src={resolveAssetUrl(img.url)} sx={{ width:120, height:80, objectFit:'cover', borderRadius:1, border:'1px solid #eee' }} />
+                                <IconButton size="small" color="error" sx={{ position:'absolute', top:0, right:0 }} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; const imgs=[...(arr[idx].data?.images||[])]; imgs.splice(ii,1); arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), images: imgs } }; return { ...p, sections:arr }; })}><CloseIcon fontSize="small" /></IconButton>
+                              </Box>
+                            ))}
+                          </Stack>
+                          <Button variant="outlined" size="small" onClick={()=> { setSectionUploadIndex(idx); fileInputRef.current?.click(); }}>Thêm ảnh</Button>
+                        </Box>
+                      )}
+
+                      {s.type === 'video' && (
+                        <TextField fullWidth label="Link video (YouTube/Vimeo/mp4)" value={s.data?.url||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), url:e.target.value } }; return { ...p, sections:arr }; })} />
+                      )}
+                    </Paper>
+                  ))}
+                </Stack>
+              )}
             </Box>
             <FormControlLabel
               control={
