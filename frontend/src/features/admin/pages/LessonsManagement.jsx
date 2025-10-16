@@ -45,7 +45,9 @@ const LessonsManagement = () => {
   });
   const [tagInput, setTagInput] = useState('');
   // Image picking uses upload only; URL input removed
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = React.useRef(null); // main lesson images
+  const sectionFileInputRef = React.useRef(null); // image uploads for a specific section gallery
+  const sectionUploadIndexRef = React.useRef(null); // avoid async state race
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [attachedQuizzes, setAttachedQuizzes] = useState([]);
@@ -171,7 +173,16 @@ const LessonsManagement = () => {
   // Removed URL-based add image
 
   const handlePickImage = () => {
+    // Explicitly reset any pending section upload target
+    setSectionUploadIndex(null);
+    sectionUploadIndexRef.current = null;
     fileInputRef.current?.click();
+  };
+
+  const handlePickSectionImage = (idx) => {
+    setSectionUploadIndex(idx); // for UI binding
+    sectionUploadIndexRef.current = idx; // for deterministic target
+    sectionFileInputRef.current?.click();
   };
 
   const handleFileChange = async (e) => {
@@ -181,13 +192,13 @@ const LessonsManagement = () => {
       const form = new FormData();
       form.append('file', file);
       const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      const url = res.data?.data?.url;
+      const url = res.data?.data?.url; // server returns /uploads/filename
       if (url) {
         if (sectionUploadIndex !== null && sectionUploadIndex !== undefined) {
           setFormData(prev => {
             const arr = [...prev.sections];
             const imgs = [...(arr[sectionUploadIndex]?.data?.images || [])];
-            imgs.push({ url, caption: '' });
+            imgs.push({ url, caption: '' }); // keep relative URL to render through resolveAssetUrl
             arr[sectionUploadIndex] = { ...arr[sectionUploadIndex], data: { ...(arr[sectionUploadIndex].data || {}), images: imgs } };
             return { ...prev, sections: arr };
           });
@@ -201,6 +212,33 @@ const LessonsManagement = () => {
     } finally {
       // reset
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSectionFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const targetIdx = sectionUploadIndexRef.current;
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = res.data?.data?.url;
+      if (url && (targetIdx || targetIdx === 0)) {
+        setFormData(prev => {
+          const arr = [...prev.sections];
+          const imgs = [...(arr[targetIdx]?.data?.images || [])];
+          imgs.push({ url, caption: '' });
+          arr[targetIdx] = { ...arr[targetIdx], data: { ...(arr[targetIdx].data || {}), images: imgs } };
+          return { ...prev, sections: arr };
+        });
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Tải ảnh thất bại');
+    } finally {
+      if (sectionFileInputRef.current) sectionFileInputRef.current.value = '';
+      setSectionUploadIndex(null);
+      sectionUploadIndexRef.current = null;
     }
   };
 
@@ -491,6 +529,7 @@ const LessonsManagement = () => {
               <Stack spacing={1}>
                 <Button variant="contained" color="secondary" onClick={handlePickImage} sx={{ alignSelf:'flex-start' }}>Chọn từ máy</Button>
                 <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+                <input ref={sectionFileInputRef} type="file" accept="image/*" hidden onChange={handleSectionFileChange} />
               </Stack>
             </Box>
 
@@ -563,7 +602,7 @@ const LessonsManagement = () => {
                               </Box>
                             ))}
                           </Stack>
-                          <Button variant="outlined" size="small" onClick={()=> { setSectionUploadIndex(idx); fileInputRef.current?.click(); }}>Thêm ảnh</Button>
+                          <Button variant="outlined" size="small" onClick={()=> handlePickSectionImage(idx)}>Thêm ảnh</Button>
                         </Box>
                       )}
 

@@ -458,12 +458,11 @@ const LessonDetail = () => {
         </Paper>
 
         {/* Lesson Content */}
-        <Paper elevation={2} sx={{ p: 4, borderRadius: 3 }}>
-          {/* Render structured sections if present; fallback to legacy contentHtml */}
-          {lesson.sections && lesson.sections.length > 0 ? (
-            <Box>
-              {lesson.sections.map((s, idx) => (
-                <Box key={idx} sx={{ mb:3 }}>
+        {/* Render structured sections if present; fallback to legacy contentHtml */}
+        {lesson.sections && lesson.sections.length > 0 ? (
+          <Box>
+            {lesson.sections.map((s, idx) => (
+              <Paper key={idx} elevation={2} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
                   {s.type === 'heading' && (
                     <Box>
                       <Typography variant="h4" sx={{ fontWeight:'bold', color:'primary.main', mt:2, mb:1 }}>
@@ -510,10 +509,11 @@ const LessonDetail = () => {
                     </Box>
                   )}
                   {s.type === 'divider' && (<Divider sx={{ my:2 }} />)}
-                </Box>
-              ))}
-            </Box>
-          ) : (
+              </Paper>
+            ))}
+          </Box>
+        ) : (
+          <Paper elevation={2} sx={{ p: 4, borderRadius: 3 }}>
             <Box
               dangerouslySetInnerHTML={{ __html: lesson.description || '' }}
               sx={{
@@ -654,8 +654,8 @@ const LessonDetail = () => {
               }
             }}
             />
-          )}
-        </Paper>
+          </Paper>
+        )}
 
         {/* Image Gallery */}
         {lesson.images && lesson.images.length > 0 && (
