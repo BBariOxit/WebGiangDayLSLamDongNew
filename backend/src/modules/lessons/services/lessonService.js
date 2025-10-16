@@ -69,6 +69,16 @@ export async function updateLessonSvc(id, data, user) {
   const createdBy = existing.CreatedBy ?? existing.created_by;
   const role = (user.role || '').toLowerCase();
   if (role !== 'admin' && createdBy !== user.id) throw new Error('Forbidden');
+  // Ensure section objects do not carry DB-only keys when passed through
+  if (Array.isArray(data.sections)) {
+    data.sections = data.sections.map((s, i) => ({
+      type: s.type,
+      title: s.title ?? null,
+      contentHtml: s.contentHtml ?? s.content_html ?? null,
+      data: s.data ?? {},
+      orderIndex: Number(s.orderIndex ?? i)
+    }));
+  }
   return updateLesson(id, data);
 }
 

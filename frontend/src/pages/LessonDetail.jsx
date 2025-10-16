@@ -465,28 +465,48 @@ const LessonDetail = () => {
               {lesson.sections.map((s, idx) => (
                 <Box key={idx} sx={{ mb:3 }}>
                   {s.type === 'heading' && (
-                    <Typography variant="h4" sx={{ fontWeight:'bold', color:'primary.main', mt:2 }}>
-                      {s.title}
-                    </Typography>
+                    <Box>
+                      <Typography variant="h4" sx={{ fontWeight:'bold', color:'primary.main', mt:2, mb:1 }}>
+                        {s.title}
+                      </Typography>
+                      {(s.content_html || s.contentHtml) && (
+                        <Box dangerouslySetInnerHTML={{ __html: s.content_html || s.contentHtml }} />
+                      )}
+                    </Box>
                   )}
                   {s.type === 'text' && (
-                    <Box dangerouslySetInnerHTML={{ __html: s.content_html || s.contentHtml || '' }} />
+                    <Box>
+                      {s.title && (
+                        <Typography variant="h5" sx={{ fontWeight:'bold', color:'text.primary', mt:1, mb:1 }}>{s.title}</Typography>
+                      )}
+                      <Box dangerouslySetInnerHTML={{ __html: s.content_html || s.contentHtml || '' }} />
+                    </Box>
                   )}
                   {s.type === 'image_gallery' && Array.isArray(s.data?.images) && s.data.images.length > 0 && (
-                    <Grid container spacing={2}>
+                    <Box>
+                      {s.title && (
+                        <Typography variant="h5" sx={{ fontWeight:'bold', color:'text.primary', mt:1, mb:2 }}>{s.title}</Typography>
+                      )}
+                      <Grid container spacing={2}>
                       {s.data.images.map((img, i) => (
                         <Grid item xs={12} sm={6} key={i}>
                           <Card>
                             <Box component="img" src={resolveAssetUrl(img.url)} alt={img.caption||''} sx={{ width:'100%', height:240, objectFit:'cover' }} />
-                            {img.caption && (<CardContent><Typography variant="body2">{img.caption}</Typography></CardContent>)}
+                            {(img.caption || img.description) && (<CardContent><Typography variant="body2">{img.caption || img.description}</Typography></CardContent>)}
                           </Card>
                         </Grid>
                       ))}
-                    </Grid>
+                      </Grid>
+                    </Box>
                   )}
                   {s.type === 'video' && s.data?.url && (
-                    <Box sx={{ position:'relative', paddingTop:'56.25%' }}>
-                      <Box component="iframe" src={s.data.url} title={s.title||`video-${idx}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen sx={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0 }} />
+                    <Box>
+                      {s.title && (
+                        <Typography variant="h5" sx={{ fontWeight:'bold', color:'text.primary', mt:1, mb:2 }}>{s.title}</Typography>
+                      )}
+                      <Box sx={{ position:'relative', paddingTop:'56.25%' }}>
+                        <Box component="iframe" src={s.data.url} title={s.title||`video-${idx}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen sx={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0 }} />
+                      </Box>
                     </Box>
                   )}
                   {s.type === 'divider' && (<Divider sx={{ my:2 }} />)}

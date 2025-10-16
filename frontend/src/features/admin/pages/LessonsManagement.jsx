@@ -534,21 +534,32 @@ const LessonsManagement = () => {
                       </Stack>
 
                       {s.type === 'heading' && (
-                        <TextField fullWidth label="Tiêu đề" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
+                        <Stack spacing={1}>
+                          <TextField fullWidth label="Tiêu đề" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
+                          <Typography variant="caption" color="text.secondary">Nội dung ngắn bên dưới tiêu đề (tuỳ chọn)</Typography>
+                          <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 140 }} />
+                          <Box sx={{ height: 8 }} />
+                        </Stack>
                       )}
 
                       {s.type === 'text' && (
-                        <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 180, marginTop: 8 }} />
+                        <Box>
+                          <TextField fullWidth label="Tiêu đề mục (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} sx={{ mb:1 }} />
+                          <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 180 }} />
+                          <Box sx={{ height: 12 }} />
+                        </Box>
                       )}
 
                       {s.type === 'image_gallery' && (
                         <Box>
+                          <TextField fullWidth label="Tiêu đề thư viện (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} sx={{ mb:1 }} />
                           <Typography variant="body2" color="text.secondary" sx={{ mb:1 }}>Thêm ảnh cho thư viện</Typography>
                           <Stack direction="row" spacing={1} flexWrap="wrap">
                             {(s.data?.images||[]).map((img, ii) => (
                               <Box key={ii} sx={{ position:'relative', mr:1, mb:1 }}>
                                 <Box component="img" src={resolveAssetUrl(img.url)} sx={{ width:120, height:80, objectFit:'cover', borderRadius:1, border:'1px solid #eee' }} />
                                 <IconButton size="small" color="error" sx={{ position:'absolute', top:0, right:0 }} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; const imgs=[...(arr[idx].data?.images||[])]; imgs.splice(ii,1); arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), images: imgs } }; return { ...p, sections:arr }; })}><CloseIcon fontSize="small" /></IconButton>
+                                <TextField size="small" placeholder="Chú thích" value={img.caption||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; const imgs=[...(arr[idx].data?.images||[])]; imgs[ii] = { ...imgs[ii], caption: e.target.value }; arr[idx] = { ...arr[idx], data: { ...(arr[idx].data||{}), images: imgs } }; return { ...p, sections: arr }; })} sx={{ mt:0.5, width:120 }} />
                               </Box>
                             ))}
                           </Stack>
@@ -557,7 +568,10 @@ const LessonsManagement = () => {
                       )}
 
                       {s.type === 'video' && (
-                        <TextField fullWidth label="Link video (YouTube/Vimeo/mp4)" value={s.data?.url||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), url:e.target.value } }; return { ...p, sections:arr }; })} />
+                        <Stack spacing={1}>
+                          <TextField fullWidth label="Tiêu đề video (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
+                          <TextField fullWidth label="Link video (YouTube/Vimeo/mp4)" value={s.data?.url||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), url:e.target.value } }; return { ...p, sections:arr }; })} />
+                        </Stack>
                       )}
                     </Paper>
                   ))}

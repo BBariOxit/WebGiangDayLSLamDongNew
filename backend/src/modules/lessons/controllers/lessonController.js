@@ -22,12 +22,12 @@ const createSchema = Joi.object({
     contentHtml: Joi.string().allow('', null),
     data: Joi.object().default({}),
     orderIndex: Joi.number().integer().min(0)
-  })).default([])
+  }).unknown(true)).default([])
 });
 
 export async function createLesson(req, res) {
   try {
-    const { error, value } = createSchema.validate(req.body);
+    const { error, value } = createSchema.validate(req.body, { stripUnknown: true });
     if (error) return fail(res, 400, error.message);
     const lesson = await createLessonSvc(value, req.user);
     created(res, lesson);
@@ -62,7 +62,7 @@ export async function updateLesson(req, res) {
   try {
     // allow optional validation of sections shape similar to create
     const updateSchema = createSchema.fork(Object.keys(createSchema.describe().keys), (s)=> s.optional());
-    const { error, value } = updateSchema.validate(req.body);
+    const { error, value } = updateSchema.validate(req.body, { stripUnknown: true });
     if (error) return fail(res, 400, error.message);
     const lesson = await updateLessonSvc(parseInt(req.params.id, 10), value, req.user);
     ok(res, lesson);
