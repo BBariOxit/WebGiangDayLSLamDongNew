@@ -689,9 +689,14 @@ const LessonDetail = () => {
                     <Box
                       sx={{
                         height: 250,
-                        backgroundImage: `url(${resolveAssetUrl(image.url)})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
+                        ...( (() => {
+                          const raw = image?.url || '';
+                          const u = resolveAssetUrl(raw);
+                          const ok = typeof u === 'string' && (u.startsWith('http') || u.startsWith('/') || u.startsWith('data:'));
+                          return ok
+                            ? { backgroundImage: `url(${u})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                            : { background: 'linear-gradient(135deg, #45b7d1, #96c93d)' };
+                        })() ),
                         position: 'relative',
                         '&::after': {
                           content: '""',

@@ -49,6 +49,29 @@ import { listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lesso
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
+// Helpers for safe image rendering with graceful fallback
+const isValidImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim();
+  return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/') || u.startsWith('data:');
+};
+
+const fallbackSvgDataUri = (text = 'Bài học') => {
+  const label = encodeURIComponent(text);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
+      <defs>
+        <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+          <stop offset='0%' stop-color='#2196f3'/>
+          <stop offset='100%' stop-color='#21cbf3'/>
+        </linearGradient>
+      </defs>
+      <rect width='100%' height='100%' fill='url(#g)'/>
+      <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Segoe UI, Arial, sans-serif' font-size='28' fill='white'>${label}</text>
+    </svg>`;
+  return `data:image/svg+xml;utf8,${svg}`;
+};
+
 const Lessons = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -521,34 +544,47 @@ const Lessons = () => {
 
                     {/* Image area */}
                     <Box sx={{ position: 'relative', height: 200, overflow: 'hidden' }}>
-                      {lesson.images && lesson.images.length > 0 ? (
-                        <Box component="img"
-                          src={resolveAssetUrl(lesson.images[0].url)}
-                          alt={lesson.title}
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      ) : (
-                        <Box sx={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: `linear-gradient(135deg, ${lesson.id % 3 === 0 ? '#ff6b6b, #ee5a52' : lesson.id % 3 === 1 ? '#4ecdc4, #44a08d' : '#45b7d1, #96c93d'})`
-                        }}>
-                          <Typography
-                            variant="h5"
-                            sx={{
-                              color: 'white',
-                              fontWeight: 'bold',
-                              textAlign: 'center',
-                              textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                              px: 2
+                      {(() => {
+                        const raw = lesson?.images?.[0]?.url || '';
+                        const resolved = resolveAssetUrl(raw);
+                        const ok = isValidImageUrl(resolved);
+                        return ok ? (
+                          <Box
+                            component="img"
+                            src={resolved}
+                            alt={lesson.title}
+                            loading="lazy"
+                            onError={(e) => {
+                              // Avoid infinite loop in case fallback fails
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = fallbackSvgDataUri(lesson.category || 'Bài học');
                             }}
-                          >
-                            {lesson.category}
-                          </Typography>
-                        </Box>
-                      )}
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : (
+                          <Box sx={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: `linear-gradient(135deg, ${lesson.id % 3 === 0 ? '#ff6b6b, #ee5a52' : lesson.id % 3 === 1 ? '#4ecdc4, #44a08d' : '#45b7d1, #96c93d'})`
+                          }}>
+                            <Typography
+                              variant="h5"
+                              sx={{
+                                color: 'white',
+                                fontWeight: 'bold',
+                                textAlign: 'center',
+                                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                                px: 2
+                              }}
+                            >
+                              {lesson.category}
+                            </Typography>
+                          </Box>
+                        );
+                      })()}
 
                       {/* Bookmark Button */}
                       <IconButton
