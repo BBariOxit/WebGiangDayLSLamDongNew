@@ -15,6 +15,7 @@ const TakeQuiz = () => {
   const [timeLeft, setTimeLeft] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -57,6 +58,28 @@ const TakeQuiz = () => {
     return () => clearTimeout(t);
   }, [timeLeft]);
 
+  // Auto-submit when time runs out (once)
+  React.useEffect(() => {
+    if (!quiz) return;
+    if (timeLeft === 0 && !submitting) {
+      // submit automatically
+      (async () => {
+        try {
+          setSubmitting(true);
+          const payloadAnswers = quiz.questions.map(qq => ({
+            questionId: Number(qq.id),
+            selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
+          }));
+          const result = await quizApi.submitAttemptByQuizId(quiz.id, payloadAnswers);
+          navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
+        } catch (e) {
+          setError(e.message || 'Nộp bài thất bại');
+          setSubmitting(false);
+        }
+      })();
+    }
+  }, [timeLeft, quiz, submitting, answers, navigate]);
+
   if (loading) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
@@ -87,10 +110,12 @@ const TakeQuiz = () => {
       selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
     }));
     try {
+      setSubmitting(true);
       const result = await quizApi.submitAttemptByQuizId(quiz.id, payloadAnswers);
       navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
     } catch (e) {
       setError(e.message || 'Nộp bài thất bại');
+      setSubmitting(false);
     }
   };
 
@@ -121,7 +146,7 @@ const TakeQuiz = () => {
       <Box sx={{ display:'flex', justifyContent:'space-between' }}>
         <Button variant="outlined" disabled={index===0} onClick={()=>setIndex(i=>i-1)}>Câu trước</Button>
         {index === quiz.questions.length - 1 ? (
-          <Button variant="contained" onClick={submit}>Nộp bài</Button>
+          <Button variant="contained" onClick={submit} disabled={submitting}>{submitting ? 'Đang nộp...' : 'Nộp bài'}</Button>
         ) : (
           <Button variant="contained" onClick={()=>setIndex(i=>i+1)}>Câu tiếp theo</Button>
         )}

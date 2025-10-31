@@ -737,6 +737,182 @@ const LessonDetail = () => {
           </Paper>
         )}
 
+        {/* Quiz Cards Section */}
+        {(quizzesForLesson && quizzesForLesson.length > 0) && (
+          <Paper elevation={2} sx={{ p: 4, borderRadius: 3, mt: 4, background: 'linear-gradient(135deg, rgba(255, 107, 107, 0.02), rgba(238, 90, 82, 0.02))' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+              <Box sx={{ 
+                width: 56, 
+                height: 56, 
+                borderRadius: 2, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
+                boxShadow: '0 4px 12px rgba(255, 107, 107, 0.3)'
+              }}>
+                <Quiz sx={{ color: 'white', fontSize: 32 }} />
+              </Box>
+              <Box>
+                <Typography variant="h4" component="h2" sx={{ fontWeight: 'bold', color: '#ff6b6b', mb: 0.5 }}>
+                  Quiz & Bài tập
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Kiểm tra kiến thức đã học qua các bài quiz dưới đây
+                </Typography>
+              </Box>
+            </Box>
+
+            <Grid container spacing={3}>
+              {quizzesForLesson.map((q, idx) => {
+                const getDifficultyTheme = (level) => {
+                  switch (level) {
+                    case 'Cơ bản':
+                      return { color: '#2e7d32', border: '#c8e6c9', tintBg: '#f1f8f4', gradient: 'linear-gradient(135deg, #c8e6c9, #a5d6a7)' };
+                    case 'Trung bình':
+                      return { color: '#ed6c02', border: '#ffe0b2', tintBg: '#fff7e6', gradient: 'linear-gradient(135deg, #ffe0b2, #ffcc80)' };
+                    case 'Nâng cao':
+                      return { color: '#c62828', border: '#ffcdd2', tintBg: '#fff1f1', gradient: 'linear-gradient(135deg, #ffcdd2, #ef9a9a)' };
+                    default:
+                      return { color: '#1976d2', border: '#bbdefb', tintBg: '#f3f8ff', gradient: 'linear-gradient(135deg, #bbdefb, #90caf9)' };
+                  }
+                };
+                const theme = getDifficultyTheme(q.difficulty);
+
+                return (
+                  <Grid item xs={12} md={6} key={q.quiz_id}>
+                    <Card
+                      sx={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        borderRadius: 3,
+                        border: `2px solid ${theme.border}`,
+                        overflow: 'hidden',
+                        transition: 'all .3s ease',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          transform: 'translateY(-6px)',
+                          boxShadow: `0 12px 28px ${theme.color}33`,
+                          borderColor: theme.color
+                        }
+                      }}
+                      onClick={() => {
+                        setSelectedQuizId(String(q.quiz_id));
+                        navigate(`/quizzes/take/${q.quiz_id}`);
+                      }}
+                    >
+                      {/* Card header with gradient */}
+                      <Box sx={{ 
+                        p: 3, 
+                        background: theme.gradient,
+                        borderBottom: `2px solid ${theme.border}`,
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Box sx={{ 
+                            width: 48, 
+                            height: 48, 
+                            borderRadius: '50%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            bgcolor: 'white',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            fontWeight: 'bold',
+                            fontSize: 20,
+                            color: theme.color
+                          }}>
+                            Q
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: theme.color, mb: 0.5 }} noWrap>
+                              {q.title}
+                            </Typography>
+                            {q.lesson_title && (
+                              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }} noWrap>
+                                Bài học: {q.lesson_title}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                        {/* Decorative corner element */}
+                        <Box sx={{
+                          position: 'absolute',
+                          top: -20,
+                          right: -20,
+                          width: 80,
+                          height: 80,
+                          borderRadius: '50%',
+                          bgcolor: 'rgba(255, 255, 255, 0.2)',
+                          filter: 'blur(20px)'
+                        }} />
+                      </Box>
+
+                      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3, lineHeight: 1.6 }}>
+                          {q.description}
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Chip 
+                            size="small" 
+                            icon={<Quiz sx={{ fontSize: 16 }} />} 
+                            label="Quiz" 
+                            sx={{ 
+                              bgcolor: '#eaf3ff', 
+                              color: '#1976d2', 
+                              fontWeight: 600,
+                              border: '1px solid #bbdefb'
+                            }} 
+                          />
+                          <Chip 
+                            size="small" 
+                            icon={<Schedule sx={{ fontSize: 16 }} />} 
+                            label={`${q.time_limit || 0} phút`} 
+                            sx={{ 
+                              bgcolor: '#fff4e5', 
+                              color: '#ed6c02', 
+                              fontWeight: 600,
+                              border: '1px solid #ffe0b2'
+                            }} 
+                          />
+                          <Chip 
+                            size="small" 
+                            label={q.difficulty} 
+                            sx={{ 
+                              bgcolor: theme.tintBg, 
+                              color: theme.color, 
+                              border: `1px solid ${theme.border}`, 
+                              fontWeight: 700 
+                            }} 
+                          />
+                        </Box>
+                      </CardContent>
+
+                      <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                        <Button 
+                          variant="contained" 
+                          endIcon={<NavigateNext />}
+                          sx={{
+                            background: `linear-gradient(135deg, ${theme.color}, ${theme.color}dd)`,
+                            '&:hover': {
+                              background: `linear-gradient(135deg, ${theme.color}dd, ${theme.color}bb)`
+                            }
+                          }}
+                        >
+                          Bắt đầu
+                        </Button>
+                      </Box>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Paper>
+        )}
+
         {/* Comment Section */}
         <CommentSection
           lessonId={lesson.id}
