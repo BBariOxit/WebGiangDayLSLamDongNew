@@ -17,7 +17,7 @@ export const lessonsData = [
     tags: ['Lịch sử','Địa danh','Lang Biang'],
     status: 'Chưa học',
     images: [
-      { url: 'https://images.unsplash.com/photo-1606036740355-56bcd30f6f5a?w=800', caption: 'Đỉnh Lang Biang', description: 'Không gian cư trú cổ của các nhóm K\'Ho – Lạch – Chil.' }
+      { url: 'https://picsum.photos/seed/langbiang-mountain/1200/800', caption: 'Đỉnh Lang Biang', description: 'Không gian cư trú cổ của các nhóm K\'Ho – Lạch – Chil.' }
     ],
     contentHtml: `
       <div class="lesson-content">
@@ -225,7 +225,7 @@ export const lessonsData = [
     tags: ['Lịch sử','Địa danh','Bảo Lộc'],
     status: 'Chưa học',
     images: [
-      { url: 'https://images.unsplash.com/photo-1586162541039-1e4d5e3f2e4d?w=800', caption: 'Bảo Lộc vùng chè & cà phê', description: 'Chuỗi giá trị nông sản chế biến.' }
+      { url: 'https://picsum.photos/seed/baoloc-tea/1200/800', caption: 'Bảo Lộc vùng chè & cà phê', description: 'Chuỗi giá trị nông sản chế biến.' }
     ],
     contentHtml: `
       <div class="lesson-content">

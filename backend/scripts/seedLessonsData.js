@@ -65,7 +65,7 @@ async function seedLessons() {
         rating: 4.9,
         category: 'Lịch sử địa phương',
         tags: ['Lịch sử', 'Địa danh', 'Lang Biang'],
-        images: [{"url": "https://images.unsplash.com/photo-1606036740355-56bcd30f6f5a?w=800", "caption": "Đỉnh Lang Biang"}]
+  images: [{"url": "https://picsum.photos/seed/langbiang-mountain/1200/800", "caption": "Đỉnh Lang Biang"}]
       },
       {
         title: 'Djiring (Di Linh): Cửa ngõ khai phá thuộc địa',
@@ -141,7 +141,7 @@ async function seedLessons() {
         rating: 4.8,
         category: 'Lịch sử địa phương',
         tags: ['Lịch sử', 'Địa danh', 'Bảo Lộc'],
-        images: [{"url": "https://images.unsplash.com/photo-1587045525133-b85362f4f43e?w=800", "caption": "Vườn chè Bảo Lộc"}]
+  images: [{"url": "https://picsum.photos/seed/baoloc-tea/1200/800", "caption": "Vườn chè Bảo Lộc"}]
       }
     ];
     
