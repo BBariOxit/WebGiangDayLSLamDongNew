@@ -3,8 +3,8 @@ import { query } from '../../../config/pool.js';
 export async function getGlobalStats() {
   const sql = `
     SELECT 
-      (SELECT COUNT(*) FROM lessons) AS total_lessons,
-      (SELECT COALESCE(SUM(students_count),0) FROM lessons) AS total_students,
+  (SELECT COUNT(*) FROM lessons) AS total_lessons,
+  (SELECT COALESCE(SUM(study_sessions_count),0) FROM lessons) AS total_study_sessions,
       (SELECT COALESCE(AVG(rating),0) FROM lessons) AS avg_rating,
       (SELECT COUNT(*) FROM quizzes) AS total_quizzes,
       (SELECT COUNT(*) FROM quiz_attempts) AS total_attempts

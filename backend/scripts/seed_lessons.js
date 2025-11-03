@@ -14,15 +14,15 @@ BEGIN
 
   -- Insert sample lessons
   INSERT INTO lessons (
-    title, 
-    slug, 
-    summary, 
+    title,
+    slug,
+    summary,
     content_html,
     instructor,
     duration,
     difficulty,
     rating,
-    students_count,
+    study_sessions_count,
     category,
     tags,
     images,
@@ -71,9 +71,9 @@ BEGIN
     true
   ),
   (
-    'Djiring (Di Linh): Cửa ngõ khai phá thuộc địa',
-    'djiring-di-linh-cua-ngo-khai-pha',
-    'Djiring trở thành trạm trung chuyển lược cuối thế kỷ XIX – đầu XX trên tuyến khảo sát cao nguyên.',
+  'Djiring (Di Linh): Cửa ngõ khai phá thuộc địa',
+  'djiring-di-linh-cua-ngo-khai-pha',
+  'Djiring trở thành trạm trung chuyển lược cuối thế kỷ XIX – đầu XX trên tuyến khảo sát cao nguyên.',
     '<div class="lesson-content">
       <h1>Djiring (Di Linh): Cửa ngõ khai phá thuộc địa</h1>
       <section>

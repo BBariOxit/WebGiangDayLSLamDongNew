@@ -68,7 +68,7 @@ const Home = () => {
             summary: lesson.summary || '',
             duration: lesson.duration || '25 phút',
             rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
-            students: lesson.students_count || 0,
+            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
             difficulty: lesson.difficulty || 'Cơ bản',
             category: lesson.category || 'Lịch sử địa phương',
             images: parsedImages,
@@ -77,13 +77,13 @@ const Home = () => {
         });
         if (!mounted) return;
         setLessons(normalized);
-        // Choose featured: prioritize known landmarks if present, else by students desc then rating desc
+  // Choose featured: prioritize known landmarks if present, else by study count desc then rating desc
         const prioritySlugs = ['lien-khuong', 'da-lat', 'djiring', 'di-linh', 'djiring-di-linh'];
         const withPriority = [...normalized].sort((a, b) => {
           const ap = prioritySlugs.some(s => (a.slug || '').includes(s)) ? 1 : 0;
           const bp = prioritySlugs.some(s => (b.slug || '').includes(s)) ? 1 : 0;
           if (ap !== bp) return bp - ap; // prioritized first
-          if (b.students !== a.students) return (b.students || 0) - (a.students || 0);
+          if ((b.studyCount || 0) !== (a.studyCount || 0)) return (b.studyCount || 0) - (a.studyCount || 0);
           if (b.rating !== a.rating) return (b.rating || 0) - (a.rating || 0);
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
@@ -102,12 +102,12 @@ const Home = () => {
     const m = String(l.duration).match(/\d+/);
     return sum + (m ? parseInt(m[0], 10) : 0);
   }, 0);
-  const totalStudents = lessons.reduce((sum, l) => sum + (l.students || 0), 0);
+  const totalStudySessions = lessons.reduce((sum, l) => sum + (l.studyCount || 0), 0);
   const averageRating = lessons.length ? (lessons.reduce((s, l) => s + (l.rating || 0), 0) / lessons.length).toFixed(1) : '0.0';
   const stats = [
-    { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#2196f3' },
-    { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },
-    { icon: People, label: 'Lượt xem', value: `${Math.max(0, Math.round(totalStudents/10)*10)}+`, color: '#4caf50' },
+  { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#2196f3' },
+  { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },
+  { icon: People, label: 'Lượt học', value: `${Math.max(0, Math.round(totalStudySessions/10)*10)}+`, color: '#4caf50' },
     { icon: EmojiEvents, label: 'Đánh giá', value: `${averageRating}/5⭐`, color: '#ff9800' }
   ];
 
@@ -372,7 +372,7 @@ const Home = () => {
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <People fontSize="small" color="action" />
-                        <Typography variant="caption">{lesson.students}</Typography>
+                        <Typography variant="caption">{lesson.studyCount} lượt học</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Star fontSize="small" sx={{ color: '#ffb400' }} />

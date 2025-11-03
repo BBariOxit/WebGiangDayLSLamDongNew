@@ -148,8 +148,8 @@ async function seedLessons() {
     for (const lesson of lessons) {
       await client.query(`
         INSERT INTO lessons (
-          title, slug, summary, content_html, instructor, duration, 
-          difficulty, rating, students_count, category, tags, images,
+          title, slug, summary, content_html, instructor, duration,
+          difficulty, rating, study_sessions_count, category, tags, images,
           status, created_by, is_published
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, $9, $10, $11, 'Chưa học', $12, true)
       `, [

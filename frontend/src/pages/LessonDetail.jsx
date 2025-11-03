@@ -50,7 +50,7 @@ import { resolveAssetUrl } from '../shared/utils/url';
 import { quizApi } from '../api/quizApi';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
-import { fetchRatingSummary } from '../api/lessonEngagementApi.js';
+import { fetchRatingSummary, recordStudySession } from '../api/lessonEngagementApi.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -69,6 +69,7 @@ const LessonDetail = () => {
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [completed, setCompleted] = useState(false);
   const [ratingSummary, setRatingSummary] = useState({ avg_rating: 0, rating_count: 0 });
+  const [studySessionPosted, setStudySessionPosted] = useState(false);
 
   useEffect(() => {
     // Fetch lesson from API by slug
@@ -113,7 +114,7 @@ const LessonDetail = () => {
           duration: lessonData.duration || '25 phút',
           difficulty: lessonData.difficulty || 'Cơ bản',
           rating: parseFloat(lessonData.rating) || 0,
-          students: lessonData.students_count || 0,
+          studyCount: Number(lessonData.study_sessions_count ?? lessonData.students_count ?? 0),
           progress: 0,
           category: lessonData.category || 'Lịch sử địa phương',
           tags: Array.isArray(lessonData.tags) ? lessonData.tags : ['Lịch sử'],
@@ -163,8 +164,30 @@ const LessonDetail = () => {
       }
     };
 
+    setStudySessionPosted(false);
     fetchLesson();
   }, [slug]);
+
+  useEffect(() => {
+    if (!lesson?.id || studySessionPosted) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await recordStudySession(lesson.id);
+        if (cancelled) return;
+        if (result && typeof result.study_sessions_count === 'number') {
+          setLesson(prev => (prev ? { ...prev, studyCount: result.study_sessions_count } : prev));
+        } else {
+          setLesson(prev => (prev ? { ...prev, studyCount: (prev.studyCount || 0) + 1 } : prev));
+        }
+      } catch (err) {
+        if (!cancelled) console.warn('recordStudySession failed', err);
+      } finally {
+        if (!cancelled) setStudySessionPosted(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [lesson?.id, studySessionPosted]);
 
   useEffect(() => {
     // Theo dõi scroll để cập nhật progress
@@ -404,8 +427,8 @@ const LessonDetail = () => {
                 <People fontSize="small" />
               </Avatar>
               <Box>
-                <Typography variant="body2" color="text.secondary">Học viên</Typography>
-                <Typography variant="body1" fontWeight="medium">{lesson.students}</Typography>
+                <Typography variant="body2" color="text.secondary">Lượt học</Typography>
+                <Typography variant="body1" fontWeight="medium">{lesson.studyCount}</Typography>
               </Box>
             </Box>
           </Box>

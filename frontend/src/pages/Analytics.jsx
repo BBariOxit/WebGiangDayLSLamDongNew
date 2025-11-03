@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Container, Grid, Card, CardContent, Typography, Chip, Paper, LinearProgress, Button, Tooltip } from '@mui/material';
-import { TrendingUp, School, Quiz, Star, Refresh } from '@mui/icons-material';
+import { TrendingUp, School, Quiz, Star, Refresh, People } from '@mui/icons-material';
 import apiClient from '../shared/services/apiClient';
 
 const StatCard = ({ icon: Icon, label, value, gradient }) => (
@@ -78,7 +78,7 @@ const Analytics = () => {
 
   const cards = globals ? [
     globals.total_lessons != null && { icon: School, label: 'Tổng bài học', value: globals.total_lessons, gradient: 'linear-gradient(135deg,#1976d2,#42a5f5)' },
-    // Removed total students card as requested
+    globals.total_study_sessions != null && { icon: People, label: 'Tổng lượt học', value: globals.total_study_sessions, gradient: 'linear-gradient(135deg,#4caf50,#81c784)' },
     globals.total_quizzes != null && { icon: Quiz, label: 'Tổng quiz', value: globals.total_quizzes, gradient: 'linear-gradient(135deg,#f57c00,#ffb74d)' },
     globals.total_attempts != null && { icon: TrendingUp, label: 'Lượt làm bài', value: globals.total_attempts, gradient: 'linear-gradient(135deg,#7b1fa2,#ba68c8)' },
     { icon: Star, label: 'Điểm đánh giá TB', value: Number(globals?.avg_rating || 0).toFixed(1), gradient: 'linear-gradient(135deg,#9c27b0,#e91e63)' }

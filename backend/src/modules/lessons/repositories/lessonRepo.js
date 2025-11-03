@@ -119,6 +119,17 @@ export async function deleteLesson(id) {
   return true;
 }
 
+export async function incrementStudySessions(lessonId) {
+  const r = await query(`
+    UPDATE lessons
+    SET study_sessions_count = COALESCE(study_sessions_count, 0) + 1,
+        updated_at = NOW()
+    WHERE lesson_id = $1
+    RETURNING lesson_id, study_sessions_count
+  `, [lessonId]);
+  return r.rows[0] || null;
+}
+
 // Sections helpers
 export async function replaceLessonSections(lessonId, sections) {
   // simple replace inside a transaction

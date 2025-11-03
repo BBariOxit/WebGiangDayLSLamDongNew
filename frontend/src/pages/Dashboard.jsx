@@ -82,7 +82,7 @@ const Dashboard = () => {
             difficulty: lesson.difficulty || 'Cơ bản',
             category: lesson.category || 'Lịch sử địa phương',
             rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
-            students: lesson.students_count || 0,
+            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
             progress: 0,
             images: parsedImages,
             createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
@@ -96,7 +96,7 @@ const Dashboard = () => {
           const ap = prioritySlugs.some(s => (a.slug || '').includes(s)) ? 1 : 0;
           const bp = prioritySlugs.some(s => (b.slug || '').includes(s)) ? 1 : 0;
           if (ap !== bp) return bp - ap;
-          if ((b.students || 0) !== (a.students || 0)) return (b.students || 0) - (a.students || 0);
+          if ((b.studyCount || 0) !== (a.studyCount || 0)) return (b.studyCount || 0) - (a.studyCount || 0);
           if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
@@ -464,7 +464,7 @@ const Dashboard = () => {
                           </Typography>
                           <GroupIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
                           <Typography variant="body2" color="text.secondary">
-                            {lesson.students} học sinh
+                            {lesson.studyCount} lượt học
                           </Typography>
                         </Box>
 

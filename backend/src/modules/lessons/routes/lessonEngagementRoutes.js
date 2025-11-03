@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyAccess } from '../../../middlewares/authMiddleware.js';
-import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl } from '../controllers/lessonEngagementController.js';
+import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl, recordStudySessionCtrl } from '../controllers/lessonEngagementController.js';
 
 const router = Router();
 
@@ -15,6 +15,9 @@ router.post('/:lessonId/progress', verifyAccess, saveProgressCtrl);
 
 // Rating summary
 router.get('/:lessonId/rating-summary', ratingSummaryCtrl);
+
+// Study sessions (count views)
+router.post('/:lessonId/study-sessions', recordStudySessionCtrl);
 
 // Quiz bundle (quiz + questions)
 router.get('/:lessonId/quiz', quizBundleCtrl);

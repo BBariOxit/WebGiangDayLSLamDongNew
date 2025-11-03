@@ -1,4 +1,5 @@
 import { createComment, listComments, deleteComment, upsertProgress, getProgress, getRatingSummary, getQuizByLesson, listQuizQuestions, recordQuizAttempt, listQuizAttempts, addBookmark, removeBookmark, listBookmarks } from '../repositories/lessonEngagementRepo.js';
+import { incrementStudySessions } from '../repositories/lessonRepo.js';
 
 export async function addCommentSvc(lessonId, user, { content, rating }) {
   if (!user) throw new Error('Unauthorized');
@@ -54,3 +55,13 @@ export async function listAttemptsSvc(quizId, user) {
 export async function addBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); return addBookmark(lessonId, user.id); }
 export async function removeBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); const r = await removeBookmark(lessonId, user.id); if(!r) throw new Error('Not found'); return { success: true }; }
 export async function listBookmarksSvc(user){ if(!user) throw new Error('Unauthorized'); return listBookmarks(user.id); }
+
+// STUDY SESSIONS
+export async function recordStudySessionSvc(lessonId) {
+  const updated = await incrementStudySessions(lessonId);
+  if (!updated) throw new Error('Not found');
+  return {
+    lesson_id: updated.lesson_id,
+    study_sessions_count: updated.study_sessions_count
+  };
+}

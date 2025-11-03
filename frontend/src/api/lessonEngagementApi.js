@@ -49,6 +49,11 @@ export async function listQuizAttempts(lessonId) {
   return res.data?.data || [];
 }
 
+export async function recordStudySession(lessonId) {
+  const res = await apiClient.post(`/lessons/${lessonId}/study-sessions`);
+  return res.data?.data || null;
+}
+
 // BOOKMARKS
 export async function listMyBookmarks(){
   const res = await apiClient.get('/lessons/me/bookmarks');

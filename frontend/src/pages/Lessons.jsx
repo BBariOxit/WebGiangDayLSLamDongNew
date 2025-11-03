@@ -146,7 +146,7 @@ const Lessons = () => {
             duration: lesson.duration || '25 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
             rating: computedRating,
-            students: lesson.students_count || 0,
+            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
             progress: 0,
             category: lesson.category || 'Lịch sử địa phương',
             tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
@@ -231,7 +231,7 @@ const Lessons = () => {
         filtered.sort((a, b) => b.rating - a.rating);
         break;
       case 'popular':
-        filtered.sort((a, b) => b.students - a.students);
+  filtered.sort((a, b) => (b.studyCount || 0) - (a.studyCount || 0));
         break;
       case 'duration':
         filtered.sort((a, b) => {
@@ -641,7 +641,7 @@ const Lessons = () => {
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <People fontSize="small" color="action" />
-                          <Typography variant="caption">{lesson.students}</Typography>
+                          <Typography variant="caption">{lesson.studyCount} lượt học</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Star fontSize="small" sx={{ color: '#ffb400' }} />
@@ -762,10 +762,10 @@ const Lessons = () => {
           <Grid item xs={12} sm={3}>
             <Box>
               <Typography variant="h4" color="info.main" fontWeight="bold">
-                {lessons.filter(lesson => lesson.progress === 100).length}
+                {lessons.reduce((sum, lesson) => sum + (lesson.studyCount || 0), 0)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Đã hoàn thành
+                Tổng lượt học
               </Typography>
             </Box>
           </Grid>
