@@ -1,5 +1,6 @@
 import slugify from 'slugify';
 import { createLesson, getLessonBySlug, getLessonById, listLessons, updateLesson, deleteLesson, replaceLessonSections } from '../repositories/lessonRepo.js';
+import { publishNewLessonNotification } from '../../notifications/services/notificationsService.js';
 
 function ensureCanEdit(user) {
   if (!user) throw new Error('Unauthorized');
@@ -38,11 +39,14 @@ export async function createLessonSvc(data, user) {
     if (Array.isArray(sections) && sections.length) {
       await replaceLessonSections(lesson.lesson_id, sections);
       const refreshed = await getLessonById(lesson.lesson_id);
+      // If published on create, publish notification
+      if (isPublished) { try { await publishNewLessonNotification(refreshed || lesson); } catch {} }
       return refreshed || lesson;
     }
   } catch (e) {
     // If sections fail to persist, still return the created lesson
   }
+  if (isPublished) { try { await publishNewLessonNotification(lesson); } catch {} }
   return lesson;
 }
 

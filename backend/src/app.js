@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import uploadRoutes from './modules/uploads/routes/uploadRoutes.js';
 import analyticsRoutes from './modules/analytics/routes/analyticsRoutes.js';
+import notificationsRoutes from './modules/notifications/routes/notificationsRoutes.js';
 import { ok, fail } from './utils/response.js';
 
 const app = express();
@@ -48,6 +49,7 @@ app.use('/api/lessons', lessonEngagementRoutes); // nested engagement endpoints
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // 404 handler
 app.use((req, res) => fail(res, 404, 'Endpoint not found', 'NOT_FOUND', { path: req.path }));

@@ -6,6 +6,7 @@ import {
   deleteQuizAndQuestions,
   updateQuizMetadata
 } from '../repositories/quizManagementRepo.js';
+import { publishNewQuizNotification } from '../../notifications/services/notificationsService.js';
 
 function ensureCanEdit(user) {
   if (!user) throw new Error('Unauthorized');
@@ -43,6 +44,7 @@ export async function createQuizSvc({ title, description, lessonId, questions, t
     difficulty,
     questions: normQuestions
   });
+  try { await publishNewQuizNotification({ ...result, quiz_id: result.quiz_id, lesson_id: result.lesson_id }); } catch {}
   return result;
 }
 
