@@ -386,14 +386,34 @@ const AppLayout = () => {
             {notifs.length === 0 ? (
               <ListItem><ListItemText primary="Không có thông báo" /></ListItem>
             ) : notifs.map(n => (
-              <ListItem key={n.notification_id} alignItems="flex-start" onClick={() => onClickNotif(n)} sx={{ cursor:'pointer', p:1.5, '&:hover':{ bgcolor:'action.hover' } }}>
+              <ListItem 
+                key={n.notification_id} 
+                alignItems="flex-start" 
+                onClick={() => onClickNotif(n)} 
+                sx={{ 
+                  cursor:'pointer', 
+                  p:1.5, 
+                  mb:0.5,
+                  border:'1px solid',
+                  borderColor:'divider',
+                  borderRadius:1,
+                  '&:hover':{ bgcolor:'action.hover' } 
+                }}
+              >
                 <ListItemAvatar>
                   <Avatar sx={{ bgcolor: n.type === 'new_quiz' ? 'secondary.main' : 'primary.main' }}>
                     {n.type === 'new_quiz' ? <QuizIcon /> : <SchoolIcon />}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText 
-                  primary={<Typography variant="subtitle2" fontWeight={600}>{n.title}</Typography>} 
+                  primary={
+                    <Box>
+                      <Box sx={{ display:'flex', alignItems:'center', gap:1, mb:0.5 }}>
+                        <Chip size="small" label={n.type === 'new_quiz' ? 'Quiz mới' : 'Bài học mới'} color={n.type === 'new_quiz' ? 'secondary' : 'primary'} />
+                      </Box>
+                      <Typography variant="subtitle2" fontWeight={600}>{n.title}</Typography>
+                    </Box>
+                  } 
                   secondary={
                     <>
                       <Typography variant="body2" color="text.secondary" sx={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{n.body}</Typography>
