@@ -65,6 +65,7 @@ const AppLayout = () => {
   const menuItems = [
     { text: 'Trang chủ', icon: HomeIcon, path: '/', color: '#2196f3' },
     { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard', color: '#4caf50' },
+    { text: 'Thống kê', icon: AnalyticsIcon, path: '/analytics', color: '#9c27b0' },
     { text: 'Bài học', icon: SchoolIcon, path: '/lessons', color: '#ff9800' },
     { text: 'Bài kiểm tra', icon: QuizIcon, path: '/quizzes', color: '#e91e63' },
     ...(user?.role === 'teacher' ? [
@@ -73,8 +74,7 @@ const AppLayout = () => {
     ] : []),
     ...(user?.role === 'admin' ? [
       { text: 'Admin: Quản lý Bài học', icon: SchoolIcon, path: '/admin/lessons', color: '#ff5722' },
-      { text: 'Admin: Quản lý Quiz', icon: QuizIcon, path: '/admin/quizzes', color: '#ff5722' },
-      { text: 'Thống kê', icon: AnalyticsIcon, path: '/analytics', color: '#9c27b0' }
+      { text: 'Admin: Quản lý Quiz', icon: QuizIcon, path: '/admin/quizzes', color: '#ff5722' }
     ] : [])
   ];
 

@@ -4,7 +4,8 @@ import {
   listQuizzes,
   getQuizWithQuestions,
   deleteQuizAndQuestions,
-  updateQuizMetadata
+  updateQuizMetadata,
+  updateQuizWithQuestions
 } from '../repositories/quizManagementRepo.js';
 import { publishNewQuizNotification } from '../../notifications/services/notificationsService.js';
 
@@ -14,27 +15,68 @@ function ensureCanEdit(user) {
   if (!['admin', 'teacher'].includes(role)) throw new Error('Forbidden');
 }
 
-export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty }, user) {
-  ensureCanEdit(user);
-  const normQuestions = (questions || []).map(q => {
-    // accept questionType but ignore (for now only MC supported)
-    const optsRaw = q.options || (q.answers ? q.answers.map(a => a.answerText) : []);
-    const opts = (optsRaw || []).map(o => String(o || '').trim()).filter(Boolean);
-    let correctIndex = q.correctIndex;
-    if ((correctIndex === undefined || correctIndex === null) && Array.isArray(q.answers)) {
-      correctIndex = q.answers.findIndex(a => a && a.isCorrect);
+function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
+  if (!Array.isArray(rawQuestions)) {
+    if (requireAtLeastOne) throw new Error('Invalid quiz questions');
+    return null;
+  }
+  const questions = [];
+
+  for (const q of rawQuestions) {
+    const questionText = String(q.questionText || q.text || '').trim();
+    if (!questionText) {
+      continue;
     }
-    if (correctIndex == null || correctIndex < 0 || correctIndex >= opts.length) {
-      correctIndex = 0; // fallback to first option
+
+    let answers = [];
+    if (Array.isArray(q.answers) && q.answers.length) {
+      answers = q.answers
+        .map((ans, idx) => ({
+          text: String(ans?.answerText ?? ans?.text ?? '').trim(),
+          isCorrect: Boolean(ans?.isCorrect || ans?.correct)
+        }))
+        .filter(ans => ans.text);
     }
-    return {
-      questionText: q.questionText || q.text || 'Câu hỏi',
-      options: opts,
+
+    if (!answers.length && Array.isArray(q.options) && q.options.length) {
+      answers = q.options
+        .map((opt, idx) => ({
+          text: String(opt ?? '').trim(),
+          isCorrect: idx === q.correctIndex
+        }))
+        .filter(ans => ans.text);
+    }
+
+    if (answers.length < 2) {
+      continue;
+    }
+
+    let correctIndex = answers.findIndex(ans => ans.isCorrect);
+    if (correctIndex < 0) {
+      correctIndex = 0;
+      answers[0] = { ...answers[0], isCorrect: true };
+    }
+
+    questions.push({
+      questionText,
+      options: answers.map(ans => ans.text),
       correctIndex,
       explanation: q.explanation || null,
-      points: Number.isFinite(q.points) ? q.points : 1
-    };
-  });
+      points: Number.isFinite(Number(q.points)) && Number(q.points) > 0 ? Number(q.points) : 1
+    });
+  }
+
+  if (!questions.length) {
+    if (requireAtLeastOne) throw new Error('Invalid quiz questions');
+    return null;
+  }
+
+  return questions;
+}
+
+export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty }, user) {
+  ensureCanEdit(user);
+  const normQuestions = normalizeQuestions(questions);
   const result = await createQuizWithQuestions({
     title,
     description,
@@ -48,7 +90,7 @@ export async function createQuizSvc({ title, description, lessonId, questions, t
   return result;
 }
 
-export async function updateQuizSvc(quizId, { title, description, lessonId, timeLimit, difficulty }, user) {
+export async function updateQuizSvc(quizId, { title, description, lessonId, timeLimit, difficulty, questions }, user) {
   ensureCanEdit(user);
   
   const existing = await getQuizById(quizId);
@@ -57,12 +99,16 @@ export async function updateQuizSvc(quizId, { title, description, lessonId, time
   const createdBy = existing.created_by;
   const role = (user.role || '').toLowerCase();
   if (role !== 'admin' && createdBy !== user.id) throw new Error('Forbidden');
-  
-  await updateQuizMetadata(quizId, { title, description, lessonId: lessonId || null, difficulty, timeLimit });
-  
-  // Could add full update: delete old questions, create new ones
-  // But for simplicity, metadata update is sufficient
-  
+
+  const payload = { title, description, lessonId: lessonId || null, difficulty, timeLimit };
+
+  if (questions === undefined) {
+    await updateQuizMetadata(quizId, payload);
+  } else {
+    const normalizedQuestions = normalizeQuestions(questions, { requireAtLeastOne: true });
+    await updateQuizWithQuestions(quizId, payload, normalizedQuestions);
+  }
+
   return { success: true, quizId };
 }
 

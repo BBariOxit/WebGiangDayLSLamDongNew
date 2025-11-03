@@ -83,7 +83,7 @@ export async function getQuizWithQuestions(quizId) {
   if (!quizMeta.rows[0]) return null;
   const quiz = quizMeta.rows[0];
   const questions = await query(`
-    SELECT question_id, question_text, options, correct_index, explanation, position
+    SELECT question_id, question_text, options, correct_index, explanation, position, points
     FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id
   `, [quizId]);
   return { ...quiz, questions: questions.rows };
@@ -100,4 +100,41 @@ export async function updateQuizMetadata(quizId, { title, description, lessonId,
     SET title=$1, description=$2, lesson_id=$3, difficulty=$4, time_limit=$5, updated_at=NOW()
     WHERE quiz_id=$6
   `, [title, description, lessonId || null, difficulty || null, timeLimit || null, quizId]);
+}
+
+export async function updateQuizWithQuestions(quizId, { title, description, lessonId, difficulty, timeLimit }, questions) {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`
+      UPDATE quizzes
+      SET title=$1, description=$2, lesson_id=$3, difficulty=$4, time_limit=$5, updated_at=NOW()
+      WHERE quiz_id=$6
+    `, [title, description, lessonId || null, difficulty || null, timeLimit || null, quizId]);
+
+    await client.query('DELETE FROM quiz_questions WHERE quiz_id = $1', [quizId]);
+
+    let position = 1;
+    for (const q of questions) {
+      await client.query(`
+        INSERT INTO quiz_questions (quiz_id, question_text, options, correct_index, explanation, position, points)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `, [
+        quizId,
+        q.questionText,
+        q.options,
+        q.correctIndex,
+        q.explanation || null,
+        position++,
+        q.points || 1
+      ]);
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
