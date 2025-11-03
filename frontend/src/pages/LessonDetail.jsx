@@ -50,7 +50,7 @@ import { resolveAssetUrl } from '../shared/utils/url';
 import { quizApi } from '../api/quizApi';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
-import { fetchRatingSummary, recordStudySession } from '../api/lessonEngagementApi.js';
+import { fetchRatingSummary, recordStudySession, listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lessonEngagementApi.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -168,6 +168,23 @@ const LessonDetail = () => {
     fetchLesson();
   }, [slug]);
 
+  // Load bookmark status for this lesson when user and lesson are available
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!user || !lesson?.id) return;
+        const items = await listMyBookmarks();
+        if (cancelled) return;
+        const setIds = new Set((items || []).map(it => Number(it.lesson_id || it.id)));
+        setIsBookmarked(setIds.has(Number(lesson.id)));
+      } catch (e) {
+        // ignore if unauthorized or network
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, lesson?.id]);
+
   useEffect(() => {
     if (!lesson?.id || studySessionPosted) return;
     let cancelled = false;
@@ -213,8 +230,21 @@ const LessonDetail = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lesson, completed, updateProgress]);
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
+  const handleBookmark = async () => {
+    if (!lesson?.id) return;
+    if (!user) {
+      alert('Vui lòng đăng nhập để lưu bài học');
+      return;
+    }
+    const next = !isBookmarked;
+    setIsBookmarked(next); // optimistic
+    try {
+      if (next) await addBookmarkApi(lesson.id); else await removeBookmarkApi(lesson.id);
+    } catch (e) {
+      // revert on failure
+      setIsBookmarked(!next);
+      console.warn('Bookmark toggle failed', e);
+    }
   };
 
   const handleShare = async () => {
