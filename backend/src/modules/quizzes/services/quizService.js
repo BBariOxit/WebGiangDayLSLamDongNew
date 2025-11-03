@@ -3,8 +3,12 @@ import {
   saveQuizAttempt, 
   getAttemptsByUser,
   getQuizQuestionsByQuizId,
-  saveQuizAttemptByQuizId
+  saveQuizAttemptByQuizId,
+  getLessonIdByQuiz
 } from '../repositories/quizRepo.js';
+import { markLessonCompleted } from '../../lessons/repositories/lessonEngagementRepo.js';
+
+const PASSING_SCORE = 70;
 
 export async function getQuizByLessonSvc(lessonId) {
   const rows = await getQuizQuestions(lessonId);
@@ -74,6 +78,14 @@ export async function submitAttemptSvc(lessonId, userId, answers) {
     answers: JSON.stringify(answers)
   });
 
+  if (scorePercent >= PASSING_SCORE) {
+    try {
+      await markLessonCompleted({ lessonId, userId, score: scorePercent });
+    } catch (err) {
+      console.warn('markLessonCompleted failed', err);
+    }
+  }
+
   return {
     attemptId: attempt.attempt_id,
     score: scorePercent,
@@ -101,6 +113,14 @@ export async function submitAttemptByQuizIdSvc(quizId, userId, answers) {
   }
   const scorePercent = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
   const attempt = await saveQuizAttemptByQuizId({ quizId, userId, score: scorePercent, answers: JSON.stringify(answers) });
+  if (scorePercent >= PASSING_SCORE) {
+    try {
+      const lessonId = await getLessonIdByQuiz(quizId);
+      if (lessonId) await markLessonCompleted({ lessonId, userId, score: scorePercent });
+    } catch (err) {
+      console.warn('markLessonCompleted failed', err);
+    }
+  }
   return { attemptId: attempt.attempt_id, score: scorePercent, earnedPoints, totalPoints, results };
 }
 

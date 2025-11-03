@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { verifyAccess } from '../../../middlewares/authMiddleware.js';
-import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl, recordStudySessionCtrl } from '../controllers/lessonEngagementController.js';
+import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl, recordStudySessionCtrl, listProgressCtrl } from '../controllers/lessonEngagementController.js';
 
 const router = Router();
+
+// User aggregates
+router.get('/me/progress', verifyAccess, listProgressCtrl);
+router.get('/me/bookmarks', verifyAccess, listBookmarksCtrl);
 
 // Comments
 router.get('/:lessonId/comments', listCommentsCtrl);
@@ -27,7 +31,6 @@ router.get('/quiz/:quizId/attempts', verifyAccess, listAttemptsCtrl);
 router.post('/quiz/:quizId/attempts', verifyAccess, submitQuizAttemptCtrl);
 
 // Bookmarks
-router.get('/me/bookmarks', verifyAccess, listBookmarksCtrl);
 router.post('/:lessonId/bookmark', verifyAccess, addBookmarkCtrl);
 router.delete('/:lessonId/bookmark', verifyAccess, removeBookmarkCtrl);
 

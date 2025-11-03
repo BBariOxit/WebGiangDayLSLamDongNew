@@ -33,6 +33,11 @@ export async function saveProgress(lessonId, progress) {
   return res.data?.data;
 }
 
+export async function listMyProgress() {
+  const res = await apiClient.get('/lessons/me/progress');
+  return res.data?.data || [];
+}
+
 // QUIZ
 export async function fetchQuizBundle(lessonId) {
   const res = await apiClient.get(`/lessons/${lessonId}/quiz-bundle`);

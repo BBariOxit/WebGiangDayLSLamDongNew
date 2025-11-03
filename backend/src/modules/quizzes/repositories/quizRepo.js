@@ -79,3 +79,8 @@ export async function getAttemptsByUser(lessonId, userId) {
   const r = await query(sql, [quizId, userId]);
   return r.rows;
 }
+
+export async function getLessonIdByQuiz(quizId) {
+  const r = await query('SELECT lesson_id FROM quizzes WHERE quiz_id=$1', [quizId]);
+  return r.rows[0]?.lesson_id || null;
+}

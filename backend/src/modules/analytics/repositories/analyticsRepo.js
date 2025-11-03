@@ -41,8 +41,8 @@ export async function getLessonBreakdown() {
 export async function getMyStats(userId) {
   const sql = `
     SELECT 
-      (SELECT COUNT(DISTINCT lesson_id) FROM user_lesson_progress WHERE user_id=$1) AS lessons_started,
-      (SELECT COUNT(DISTINCT lesson_id) FROM user_lesson_progress WHERE user_id=$1 AND is_completed=true) AS lessons_completed,
+      (SELECT COUNT(DISTINCT lesson_id) FROM lesson_progress WHERE user_id=$1 AND progress > 0) AS lessons_started,
+      (SELECT COUNT(DISTINCT lesson_id) FROM lesson_progress WHERE user_id=$1 AND is_completed = TRUE) AS lessons_completed,
       (SELECT COUNT(*) FROM quiz_attempts WHERE user_id=$1) AS attempts,
       (SELECT COALESCE(ROUND(AVG(score)),0) FROM quiz_attempts WHERE user_id=$1) AS avg_score
   `;

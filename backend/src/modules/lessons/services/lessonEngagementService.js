@@ -1,5 +1,7 @@
-import { createComment, listComments, deleteComment, upsertProgress, getProgress, getRatingSummary, getQuizByLesson, listQuizQuestions, recordQuizAttempt, listQuizAttempts, addBookmark, removeBookmark, listBookmarks } from '../repositories/lessonEngagementRepo.js';
+import { createComment, listComments, deleteComment, upsertProgress, getProgress, getRatingSummary, getQuizByLesson, listQuizQuestions, recordQuizAttempt, listQuizAttempts, addBookmark, removeBookmark, listBookmarks, markLessonCompleted, listProgressByUser, getLessonIdForQuiz } from '../repositories/lessonEngagementRepo.js';
 import { incrementStudySessions } from '../repositories/lessonRepo.js';
+
+const PASSING_SCORE = 70;
 
 export async function addCommentSvc(lessonId, user, { content, rating }) {
   if (!user) throw new Error('Unauthorized');
@@ -27,7 +29,7 @@ export async function saveProgressSvc(lessonId, user, { progress }) {
 
 export async function getProgressSvc(lessonId, user) {
   if (!user) throw new Error('Unauthorized');
-  return getProgress(lessonId, user.id) || { lesson_id: lessonId, progress: 0 };
+  return getProgress(lessonId, user.id) || { lesson_id: lessonId, progress: 0, is_completed: false, completed_at: null, best_score: 0 };
 }
 
 export async function getRatingSummarySvc(lessonId) {
@@ -43,7 +45,18 @@ export async function getQuizBundleSvc(lessonId) {
 
 export async function submitQuizAttemptSvc(quizId, user, { score, durationSeconds, answers }) {
   if (!user) throw new Error('Unauthorized');
-  return recordQuizAttempt({ quizId, userId: user.id, score, durationSeconds, answers });
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  const attempt = await recordQuizAttempt({ quizId, userId: user.id, score: safeScore, durationSeconds, answers });
+  if (safeScore >= PASSING_SCORE) {
+    try {
+      const lessonId = await getLessonIdForQuiz(quizId);
+      if (lessonId) await markLessonCompleted({ lessonId, userId: user.id, score: safeScore });
+    } catch (err) {
+      // Do not fail attempt recording if completion update fails
+      console.warn('markLessonCompleted failed', err);
+    }
+  }
+  return attempt;
 }
 
 export async function listAttemptsSvc(quizId, user) {
@@ -55,6 +68,8 @@ export async function listAttemptsSvc(quizId, user) {
 export async function addBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); return addBookmark(lessonId, user.id); }
 export async function removeBookmarkSvc(lessonId, user){ if(!user) throw new Error('Unauthorized'); const r = await removeBookmark(lessonId, user.id); if(!r) throw new Error('Not found'); return { success: true }; }
 export async function listBookmarksSvc(user){ if(!user) throw new Error('Unauthorized'); return listBookmarks(user.id); }
+
+export async function listProgressForUserSvc(user){ if(!user) throw new Error('Unauthorized'); return listProgressByUser(user.id); }
 
 // STUDY SESSIONS
 export async function recordStudySessionSvc(lessonId) {

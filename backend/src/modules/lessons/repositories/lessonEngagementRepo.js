@@ -99,3 +99,35 @@ export async function listBookmarks(userId) {
   `, [userId]);
   return r.rows;
 }
+
+// COMPLETIONS / PROGRESS SNAPSHOT
+export async function markLessonCompleted({ lessonId, userId, score }) {
+  if (!lessonId || !userId) return null;
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  const r = await query(`
+    INSERT INTO lesson_progress (lesson_id, user_id, progress, last_viewed_at, is_completed, completed_at, best_score)
+    VALUES ($1,$2,100,NOW(),TRUE,NOW(),$3)
+    ON CONFLICT (lesson_id, user_id) DO UPDATE
+    SET progress = 100,
+        is_completed = TRUE,
+        completed_at = COALESCE(lesson_progress.completed_at, NOW()),
+        best_score = GREATEST(lesson_progress.best_score, EXCLUDED.best_score),
+        last_viewed_at = NOW()
+    RETURNING *
+  `, [lessonId, userId, safeScore]);
+  return r.rows[0] || null;
+}
+
+export async function listProgressByUser(userId) {
+  const r = await query(`
+    SELECT lesson_id, progress, is_completed, completed_at, best_score
+    FROM lesson_progress
+    WHERE user_id = $1
+  `, [userId]);
+  return r.rows;
+}
+
+export async function getLessonIdForQuiz(quizId) {
+  const r = await query('SELECT lesson_id FROM quizzes WHERE quiz_id=$1', [quizId]);
+  return r.rows[0]?.lesson_id || null;
+}

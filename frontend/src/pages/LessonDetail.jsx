@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -50,14 +50,14 @@ import { resolveAssetUrl } from '../shared/utils/url';
 import { quizApi } from '../api/quizApi';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import CommentSection from '../shared/components/CommentSection';
-import { fetchRatingSummary, recordStudySession, listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lessonEngagementApi.js';
+import { fetchRatingSummary, recordStudySession, listMyBookmarks, addBookmarkApi, removeBookmarkApi, fetchProgress, saveProgress } from '../api/lessonEngagementApi.js';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const LessonDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { user, updateProgress } = useAuth();
+  const { user } = useAuth();
   const [lesson, setLesson] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
@@ -70,6 +70,7 @@ const LessonDetail = () => {
   const [completed, setCompleted] = useState(false);
   const [ratingSummary, setRatingSummary] = useState({ avg_rating: 0, rating_count: 0 });
   const [studySessionPosted, setStudySessionPosted] = useState(false);
+  const lastSavedProgressRef = useRef(0);
 
   useEffect(() => {
     // Fetch lesson from API by slug
@@ -124,8 +125,28 @@ const LessonDetail = () => {
         };
         
         setLesson(mappedLesson);
-        setIsBookmarked(Math.random() > 0.5);
-        setCompleted(mappedLesson.progress === 100);
+
+        if (user) {
+          try {
+            const progressRow = await fetchProgress(mappedLesson.id);
+            if (progressRow) {
+              const normalized = Number(progressRow.progress ?? 0);
+              lastSavedProgressRef.current = normalized;
+              if (normalized > 0) setReadingProgress(normalized);
+              setCompleted(!!progressRow.is_completed);
+            } else {
+              lastSavedProgressRef.current = 0;
+              setCompleted(false);
+            }
+          } catch (err) {
+            console.warn('fetchProgress failed', err);
+            lastSavedProgressRef.current = 0;
+            setCompleted(false);
+          }
+        } else {
+          lastSavedProgressRef.current = 0;
+          setCompleted(false);
+        }
         
         // Load quizzes for this lesson (list)
         try {
@@ -166,7 +187,7 @@ const LessonDetail = () => {
 
     setStudySessionPosted(false);
     fetchLesson();
-  }, [slug]);
+  }, [slug, user?.id]);
 
   // Load bookmark status for this lesson when user and lesson are available
   useEffect(() => {
@@ -207,28 +228,35 @@ const LessonDetail = () => {
   }, [lesson?.id, studySessionPosted]);
 
   useEffect(() => {
-    // Theo dõi scroll để cập nhật progress
+    const MIN_DELTA = 10;
     const handleScroll = () => {
       const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
       const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-      const scrolled = (winScroll / height) * 100;
-      
-      setReadingProgress(Math.min(scrolled, 100));
+      const scrolled = height > 0 ? (winScroll / height) * 100 : 0;
+
+      const clamped = Math.min(Math.max(scrolled, 0), 100);
+      setReadingProgress(clamped);
       setShowScrollTop(winScroll > 300);
-      
-      // Auto save progress
-      if (scrolled > 50 && !completed && lesson) {
-        const newProgress = Math.min(Math.round(scrolled), 100);
-        updateProgress(lesson?.id, newProgress);
-        if (newProgress === 100) {
-          setCompleted(true);
-        }
+
+      if (!lesson?.id || !user) return;
+
+      const newProgress = Math.min(Math.round(clamped), 100);
+      const reachedCompletion = newProgress === 100;
+      const shouldPersist = (newProgress >= 20 && newProgress - lastSavedProgressRef.current >= MIN_DELTA) || (reachedCompletion && lastSavedProgressRef.current < 100);
+
+      if (shouldPersist) {
+        lastSavedProgressRef.current = newProgress;
+        saveProgress(lesson.id, newProgress).catch(err => console.warn('saveProgress failed', err));
+      }
+
+      if (reachedCompletion && !completed) {
+        setCompleted(true);
       }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [lesson, completed, updateProgress]);
+  }, [lesson?.id, user?.id, completed]);
 
   const handleBookmark = async () => {
     if (!lesson?.id) return;

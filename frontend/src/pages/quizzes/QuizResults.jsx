@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { Box, Container, Paper, Typography, Button, Chip, LinearProgress, Divider, Card, CardContent } from '@mui/material';
+import { Box, Container, Paper, Typography, Button, Chip, LinearProgress, Divider, Card, CardContent, Alert } from '@mui/material';
 import { CheckCircle, Cancel, EmojiEvents, TrendingUp, Refresh, Home } from '@mui/icons-material';
 
 const QuizResults = () => {
@@ -115,6 +115,16 @@ const QuizResults = () => {
           </Box>
         </Box>
       </Paper>
+
+      {passed ? (
+        <Alert severity="success" sx={{ mb: 3 }} icon={<CheckCircle fontSize="small" />}>
+          Bài học liên quan đã được đánh dấu <strong>Hoàn thành</strong>. Bạn có thể xem lại trong tab Hoàn thành trên trang Bài học.
+        </Alert>
+      ) : (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Đạt từ 70% trở lên để đánh dấu bài học là hoàn thành và mở khóa huy hiệu tiến độ của bạn.
+        </Alert>
+      )}
 
       {/* Score breakdown */}
       <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>

@@ -40,12 +40,13 @@ import {
   Bookmark,
   TrendingUp,
   CheckCircle,
-  Lock
+  Lock,
+  EmojiEvents
 } from '@mui/icons-material';
 import axios from 'axios';
 import { resolveAssetUrl } from '../shared/utils/url';
 import { useAuth } from '@features/auth/hooks/useAuth';
-import { listMyBookmarks, addBookmarkApi, removeBookmarkApi } from '../api/lessonEngagementApi';
+import { listMyBookmarks, addBookmarkApi, removeBookmarkApi, listMyProgress } from '../api/lessonEngagementApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -84,6 +85,7 @@ const Lessons = () => {
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
   const [bookmarkedLessons, setBookmarkedLessons] = useState(new Set());
+  const [progressLookup, setProgressLookup] = useState(new Map());
   const [error, setError] = useState(null);
 
   // Fetch lessons from API
@@ -104,14 +106,31 @@ const Lessons = () => {
           setError('Dữ liệu trả về không đúng định dạng (expected array).');
           setLessons([]);
           setFilteredLessons([]);
+          setProgressLookup(new Map());
           return;
         }
 
-        if (payload.length === 0) {
-          console.warn('No lessons found in payload');
-          setLessons([]);
-          setFilteredLessons([]);
-          return;
+        let progressRows = [];
+        const progressMap = new Map();
+        if (user) {
+          try {
+            progressRows = await listMyProgress();
+            progressRows.forEach(row => {
+              const lessonId = Number(row.lesson_id);
+              progressMap.set(lessonId, {
+                progress: Number(row.progress ?? 0),
+                isCompleted: !!row.is_completed,
+                completedAt: row.completed_at || null,
+                bestScore: Number(row.best_score ?? 0)
+              });
+            });
+            setProgressLookup(new Map(progressMap));
+          } catch (err) {
+            console.warn('listMyProgress failed', err);
+            setProgressLookup(new Map());
+          }
+        } else {
+          setProgressLookup(new Map());
         }
 
         const lessonsFromAPI = payload.map(lesson => {
@@ -134,8 +153,11 @@ const Lessons = () => {
 
           const avg = parseFloat(lesson.avg_rating ?? lesson.rating ?? 0) || 0;
           const rcount = Number(lesson.rating_count ?? 0);
-          // Default to 5.0 stars when there are no ratings, per requirement
           const computedRating = rcount === 0 ? 5.0 : Math.round(avg * 10) / 10;
+          const progressInfo = progressMap.get(Number(lesson.lesson_id)) || {};
+          const isCompleted = !!progressInfo.isCompleted;
+          const progressPercent = isCompleted ? 100 : Number(progressInfo.progress ?? 0);
+          const bestScore = Number(progressInfo.bestScore ?? 0);
           return {
             id: lesson.lesson_id,
             title: lesson.title,
@@ -147,7 +169,10 @@ const Lessons = () => {
             difficulty: lesson.difficulty || 'Cơ bản',
             rating: computedRating,
             studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
-            progress: 0,
+            progress: progressPercent,
+            isCompleted,
+            completedAt: progressInfo.completedAt || null,
+            bestScore,
             category: lesson.category || 'Lịch sử địa phương',
             tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
             status: lesson.status || 'Chưa học',
@@ -210,7 +235,7 @@ const Lessons = () => {
         filtered = filtered.filter(lesson => lesson.progress > 0 && lesson.progress < 100);
         break;
       case 2: // Đã hoàn thành
-        filtered = filtered.filter(lesson => lesson.progress === 100);
+        filtered = filtered.filter(lesson => lesson.isCompleted);
         break;
       case 3: // Đã lưu
         filtered = filtered.filter(lesson => bookmarkedLessons.has(lesson.id));
@@ -448,7 +473,7 @@ const Lessons = () => {
         >
           <Tab label={`Tất cả (${lessons.length})`} />
           <Tab label={`Đang học (${lessons.filter(l => l.progress > 0 && l.progress < 100).length})`} />
-          <Tab label={`Hoàn thành (${lessons.filter(l => l.progress === 100).length})`} />
+          <Tab label={`Hoàn thành (${lessons.filter(l => l.isCompleted).length})`} />
           <Tab label={`Đã lưu (${bookmarkedLessons.size})`} />
         </Tabs>
       </Paper>
@@ -601,13 +626,15 @@ const Lessons = () => {
                       </IconButton>
 
                       {/* Completion Badge */}
-                      {lesson.progress === 100 && (
-                        <Chip
-                          icon={<CheckCircle />}
-                          label="Hoàn thành"
-                          color="success"
-                          sx={{ position: 'absolute', top: 8, left: 8, fontWeight: 'bold' }}
-                        />
+                      {lesson.isCompleted && (
+                        <Tooltip title={`Điểm cao nhất: ${lesson.bestScore ?? 0}%`} placement="right">
+                          <Chip
+                            icon={<CheckCircle />}
+                            label="Hoàn thành"
+                            color="success"
+                            sx={{ position: 'absolute', top: 8, left: 8, fontWeight: 'bold' }}
+                          />
+                        </Tooltip>
                       )}
                     </Box>
 
@@ -647,6 +674,12 @@ const Lessons = () => {
                           <Star fontSize="small" sx={{ color: '#ffb400' }} />
                           <Typography variant="caption">{lesson.rating}</Typography>
                         </Box>
+                        {lesson.isCompleted && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <EmojiEvents fontSize="small" color="success" />
+                            <Typography variant="caption">{lesson.bestScore ?? 0}%</Typography>
+                          </Box>
+                        )}
                       </Box>
 
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

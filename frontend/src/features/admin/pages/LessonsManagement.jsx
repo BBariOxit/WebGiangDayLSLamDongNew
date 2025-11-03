@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Container, Typography, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, IconButton, Chip, Dialog, DialogTitle,
@@ -23,6 +23,7 @@ import apiClient from '../../../shared/services/apiClient';
 import Divider from '@mui/material/Divider';
 import { resolveAssetUrl } from '../../../shared/utils/url';
 import ReactQuill from 'react-quill';
+import { useAuth } from '../../auth/hooks/useAuth';
 import 'react-quill/dist/quill.snow.css';
 
 const LessonsManagement = () => {
@@ -63,10 +64,21 @@ const LessonsManagement = () => {
       { questionText: '', options: ['', '', '', ''], correctIndex: 0 }
     ]
   });
+  const { user, isTeacher, isAdmin } = useAuth();
 
   useEffect(() => {
     loadLessons();
   }, []);
+
+  const canManageLesson = useCallback((lesson) => {
+    if (!lesson) return false;
+    if (isAdmin) return true;
+    if (isTeacher && user?.id) {
+      const createdBy = lesson.created_by ?? lesson.createdBy ?? lesson.CreatedBy ?? lesson.createdby ?? null;
+      return Number(createdBy) === Number(user.id);
+    }
+    return false;
+  }, [isAdmin, isTeacher, user?.id]);
 
   const loadLessons = async () => {
     try {
@@ -87,7 +99,7 @@ const LessonsManagement = () => {
       summary: '', 
       contentHtml: '', 
       isPublished: true,
-      instructor: 'Nhóm biên soạn địa phương',
+      instructor: (isTeacher && user?.name) ? user.name : 'Nhóm biên soạn địa phương',
       duration: '25 phút',
       difficulty: 'Cơ bản',
       category: 'Lịch sử địa phương',
@@ -108,6 +120,10 @@ const LessonsManagement = () => {
   };
 
   const handleOpenEdit = async (lesson) => {
+    if (!canManageLesson(lesson)) {
+      setError('Bạn chỉ có thể chỉnh sửa bài học do bạn tạo.');
+      return;
+    }
     try {
       const res = await lessonService.getById(lesson.lesson_id);
       const data = res.data;
@@ -117,7 +133,7 @@ const LessonsManagement = () => {
         summary: data.summary || '',
         contentHtml: data.content_html || '',
         isPublished: data.is_published || false,
-        instructor: data.instructor || 'Nhóm biên soạn địa phương',
+  instructor: data.instructor || ((isTeacher && user?.name) ? user.name : 'Nhóm biên soạn địa phương'),
         duration: data.duration || '25 phút',
         difficulty: data.difficulty || 'Cơ bản',
         category: data.category || 'Lịch sử địa phương',
@@ -317,7 +333,11 @@ const LessonsManagement = () => {
     setQuizForm(f => ({ ...f, questions: f.questions.filter((_, i) => i !== idx) }));
   };
 
-  const handleDelete = async (lessonId) => {
+  const handleDelete = async (lessonId, lesson) => {
+    if (!canManageLesson(lesson)) {
+      setError('Bạn chỉ có thể xóa bài học do bạn tạo.');
+      return;
+    }
     if (!window.confirm('Bạn có chắc muốn xóa bài học này?')) return;
     try {
       await lessonService.delete(lessonId);
@@ -391,15 +411,27 @@ const LessonsManagement = () => {
                   </TableCell>
                   <TableCell>{new Date(lesson.created_at).toLocaleDateString('vi-VN')}</TableCell>
                   <TableCell align="center">
-                    <Tooltip title="Chỉnh sửa">
-                      <IconButton color="primary" onClick={() => handleOpenEdit(lesson)}>
-                        <EditIcon />
-                      </IconButton>
+                    <Tooltip title={canManageLesson(lesson) ? 'Chỉnh sửa' : 'Chỉ chỉnh sửa được bài học do bạn tạo'}>
+                      <span>
+                        <IconButton 
+                          color="primary" 
+                          onClick={() => handleOpenEdit(lesson)}
+                          disabled={!canManageLesson(lesson)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </span>
                     </Tooltip>
-                    <Tooltip title="Xóa">
-                      <IconButton color="error" onClick={() => handleDelete(lesson.lesson_id)}>
-                        <DeleteIcon />
-                      </IconButton>
+                    <Tooltip title={canManageLesson(lesson) ? 'Xóa' : 'Chỉ xóa được bài học do bạn tạo'}>
+                      <span>
+                        <IconButton 
+                          color="error" 
+                          onClick={() => handleDelete(lesson.lesson_id, lesson)}
+                          disabled={!canManageLesson(lesson)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </span>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
