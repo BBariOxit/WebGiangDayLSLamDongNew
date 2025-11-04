@@ -1,16 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Box, Container, Typography, Button, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, IconButton, Chip, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Alert, CircularProgress, Stack,
-  Tooltip, Select, MenuItem, FormControl, InputLabel, Card, CardContent,
-  Divider, Radio, RadioGroup, FormControlLabel, FormLabel
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Tooltip,
+  Typography
 } from '@mui/material';
 import {
-  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-  Quiz as QuizIcon, RemoveCircle as RemoveIcon
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Quiz as QuizIcon,
+  RemoveCircle as RemoveIcon
 } from '@mui/icons-material';
+import Radio from '@mui/material/Radio';
 import { quizManagementService, lessonService } from '../../../shared/services/managementService';
+
+const ASSESSMENT_TYPES = [
+  {
+    value: 'quiz',
+    label: 'Quiz trắc nghiệm (1 đáp án)',
+    description: 'Câu hỏi trắc nghiệm với một đáp án đúng duy nhất.',
+    accent: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+  },
+  {
+    value: 'multi_choice',
+    label: 'Trắc nghiệm nhiều đáp án',
+    description: 'Cho phép chọn nhiều đáp án đúng bằng ô vuông.',
+    accent: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%)'
+  },
+  {
+    value: 'fill_blank',
+    label: 'Điền vào chỗ trống',
+    description: 'Học sinh nhập câu trả lời, hỗ trợ nhiều đáp án đúng.',
+    accent: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)'
+  }
+];
+
+const createEmptyQuestion = (type) => {
+  if (type === 'fill_blank') {
+    return {
+      questionText: '',
+      questionType: 'fill_blank',
+      points: 1,
+      acceptedAnswers: [''],
+      explanation: ''
+    };
+  }
+
+  const defaultAnswers = [
+    { answerText: '', isCorrect: type === 'quiz' },
+    { answerText: '', isCorrect: false }
+  ];
+
+  return {
+    questionText: '',
+    questionType: type === 'multi_choice' ? 'multi_select' : 'single_choice',
+    points: 1,
+    answers: defaultAnswers,
+    explanation: ''
+  };
+};
+
+const normalizeAssessmentType = (value) => {
+  const lower = String(value || '').toLowerCase();
+  return ASSESSMENT_TYPES.some(t => t.value === lower) ? lower : 'quiz';
+};
 
 const QuizzesManagement = () => {
   const [quizzes, setQuizzes] = useState([]);
@@ -22,17 +101,8 @@ const QuizzesManagement = () => {
     title: '',
     description: '',
     lessonId: null,
-    questions: [
-      {
-        questionText: '',
-        questionType: 'multiple_choice',
-        points: 1,
-        answers: [
-          { answerText: '', isCorrect: false },
-          { answerText: '', isCorrect: false }
-        ]
-      }
-    ]
+    assessmentType: 'quiz',
+    questions: [createEmptyQuestion('quiz')]
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -48,7 +118,7 @@ const QuizzesManagement = () => {
         quizManagementService.list(),
         lessonService.list()
       ]);
-  setQuizzes(quizRes.data || []);
+      setQuizzes(quizRes.data || []);
       setLessons(lessonRes.data || []);
     } catch (e) {
       setError('Không thể tải dữ liệu: ' + e.message);
@@ -57,22 +127,17 @@ const QuizzesManagement = () => {
     }
   };
 
+  const resetForm = (type = 'quiz') => ({
+    title: '',
+    description: '',
+    lessonId: null,
+    assessmentType: normalizeAssessmentType(type),
+    questions: [createEmptyQuestion(type)]
+  });
+
   const handleOpenCreate = () => {
     setEditingQuiz(null);
-    setFormData({
-      title: '',
-      description: '',
-      lessonId: null,
-      questions: [{
-        questionText: '',
-        questionType: 'multiple_choice',
-        points: 1,
-        answers: [
-          { answerText: '', isCorrect: false },
-          { answerText: '', isCorrect: false }
-        ]
-      }]
-    });
+    setFormData(resetForm('quiz'));
     setOpenDialog(true);
   };
 
@@ -81,89 +146,208 @@ const QuizzesManagement = () => {
     setEditingQuiz(null);
   };
 
+  const handleAssessmentTypeChange = (nextType) => {
+    setFormData(prev => ({
+      ...resetForm(nextType),
+      title: prev.title,
+      description: prev.description,
+      lessonId: prev.lessonId
+    }));
+  };
+
   const addQuestion = () => {
-    setFormData({
-      ...formData,
-      questions: [
-        ...formData.questions,
-        {
-          questionText: '',
-          questionType: 'multiple_choice',
-          points: 1,
-          answers: [
-            { answerText: '', isCorrect: false },
-            { answerText: '', isCorrect: false }
-          ]
-        }
-      ]
-    });
+    setFormData(prev => ({
+      ...prev,
+      questions: [...prev.questions, createEmptyQuestion(prev.assessmentType)]
+    }));
   };
 
   const removeQuestion = (idx) => {
-    setFormData({
-      ...formData,
-      questions: formData.questions.filter((_, i) => i !== idx)
+    setFormData(prev => ({
+      ...prev,
+      questions: prev.questions.filter((_, i) => i !== idx)
+    }));
+  };
+
+  const updateQuestionField = (idx, field, value) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      clone[idx] = { ...clone[idx], [field]: value };
+      return { ...prev, questions: clone };
     });
   };
 
-  const updateQuestion = (idx, field, value) => {
-    const updated = [...formData.questions];
-    updated[idx][field] = value;
-    setFormData({ ...formData, questions: updated });
+  const updateAnswerField = (qIdx, aIdx, field, value) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const answers = [...(clone[qIdx].answers || [])];
+      answers[aIdx] = { ...answers[aIdx], [field]: value };
+      clone[qIdx] = { ...clone[qIdx], answers };
+      return { ...prev, questions: clone };
+    });
   };
 
-  const addAnswer = (qIdx) => {
-    const updated = [...formData.questions];
-    updated[qIdx].answers.push({ answerText: '', isCorrect: false });
-    setFormData({ ...formData, questions: updated });
+  const addChoiceAnswer = (qIdx) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const answers = [...(clone[qIdx].answers || [])];
+      answers.push({ answerText: '', isCorrect: false });
+      clone[qIdx] = { ...clone[qIdx], answers };
+      return { ...prev, questions: clone };
+    });
   };
 
-  const removeAnswer = (qIdx, aIdx) => {
-    const updated = [...formData.questions];
-    updated[qIdx].answers = updated[qIdx].answers.filter((_, i) => i !== aIdx);
-    setFormData({ ...formData, questions: updated });
+  const removeChoiceAnswer = (qIdx, aIdx) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const answers = [...(clone[qIdx].answers || [])].filter((_, i) => i !== aIdx);
+      clone[qIdx] = { ...clone[qIdx], answers };
+      return { ...prev, questions: clone };
+    });
   };
 
-  const updateAnswer = (qIdx, aIdx, field, value) => {
-    const updated = [...formData.questions];
-    updated[qIdx].answers[aIdx][field] = value;
-    setFormData({ ...formData, questions: updated });
+  const toggleCorrectAnswer = (qIdx, aIdx, checked) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const question = { ...clone[qIdx] };
+      const isMulti = question.questionType === 'multi_select';
+      const answers = [...(question.answers || [])].map((ans, idx) => {
+        if (isMulti) {
+          return idx === aIdx ? { ...ans, isCorrect: checked } : ans;
+        }
+        return { ...ans, isCorrect: idx === aIdx };
+      });
+      clone[qIdx] = { ...question, answers };
+      return { ...prev, questions: clone };
+    });
   };
+
+  const addAcceptedAnswer = (qIdx) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const accepted = [...(clone[qIdx].acceptedAnswers || [])];
+      accepted.push('');
+      clone[qIdx] = { ...clone[qIdx], acceptedAnswers: accepted };
+      return { ...prev, questions: clone };
+    });
+  };
+
+  const removeAcceptedAnswer = (qIdx, aIdx) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const accepted = [...(clone[qIdx].acceptedAnswers || [])].filter((_, i) => i !== aIdx);
+      clone[qIdx] = { ...clone[qIdx], acceptedAnswers: accepted.length ? accepted : [''] };
+      return { ...prev, questions: clone };
+    });
+  };
+
+  const updateAcceptedAnswer = (qIdx, aIdx, value) => {
+    setFormData(prev => {
+      const clone = [...prev.questions];
+      const accepted = [...(clone[qIdx].acceptedAnswers || [])];
+      accepted[aIdx] = value;
+      clone[qIdx] = { ...clone[qIdx], acceptedAnswers: accepted };
+      return { ...prev, questions: clone };
+    });
+  };
+
+  const preparedQuestions = useMemo(() => formData.questions.map(q => ({ ...q })), [formData.questions]);
 
   const handleSave = async () => {
     try {
       setError('');
-      if (!formData.title.trim()) {
-        setError('Vui lòng nhập tiêu đề quiz');
+      const trimmedTitle = formData.title.trim();
+      if (!trimmedTitle) {
+        setError('Vui lòng nhập tiêu đề bài kiểm tra');
         return;
       }
 
-      if (formData.questions.length === 0) {
+      if (!formData.questions.length) {
         setError('Cần có ít nhất 1 câu hỏi');
         return;
       }
 
-      for (let q of formData.questions) {
-        if (!q.questionText.trim()) {
-          setError('Vui lòng nhập nội dung câu hỏi');
-          return;
+      const assessmentType = normalizeAssessmentType(formData.assessmentType);
+      const normalizedQuestions = preparedQuestions.map((q, idx) => {
+        const questionText = String(q.questionText || '').trim();
+        if (!questionText) {
+          throw new Error(`Câu hỏi #${idx + 1} chưa có nội dung`);
         }
-        if (q.answers.length < 2) {
-          setError('Mỗi câu hỏi cần ít nhất 2 đáp án');
-          return;
+
+        const points = Number.isFinite(Number(q.points)) && Number(q.points) > 0 ? Number(q.points) : 1;
+
+        if (assessmentType === 'fill_blank') {
+          const acceptedAnswers = (q.acceptedAnswers || [])
+            .map(ans => String(ans || '').trim())
+            .filter(Boolean);
+          if (!acceptedAnswers.length) {
+            throw new Error(`Câu hỏi #${idx + 1} cần ít nhất 1 đáp án đúng`);
+          }
+          return {
+            questionText,
+            questionType: 'fill_blank',
+            acceptedAnswers,
+            points,
+            explanation: q.explanation || ''
+          };
         }
-        if (!q.answers.some(a => a.isCorrect)) {
-          // Auto pick the first answer as correct to reduce friction
-          q.answers = q.answers.map((a, idx) => ({ ...a, isCorrect: idx === 0 }));
+
+        const answers = (q.answers || [])
+          .map(ans => ({
+            answerText: String(ans.answerText || '').trim(),
+            isCorrect: Boolean(ans.isCorrect)
+          }))
+          .filter(ans => ans.answerText);
+
+        if (answers.length < 2) {
+          throw new Error(`Câu hỏi #${idx + 1} cần ít nhất 2 đáp án`);
         }
-      }
+
+        if (assessmentType === 'quiz') {
+          if (!answers.some(ans => ans.isCorrect)) {
+            answers[0] = { ...answers[0], isCorrect: true };
+          }
+          const correctIndex = answers.findIndex(ans => ans.isCorrect);
+          return {
+            questionText,
+            questionType: 'single_choice',
+            answers,
+            correctIndex,
+            points,
+            explanation: q.explanation || ''
+          };
+        }
+
+        if (!answers.some(ans => ans.isCorrect)) {
+          answers[0] = { ...answers[0], isCorrect: true };
+        }
+        const correctIndexes = answers
+          .map((ans, i) => (ans.isCorrect ? i : null))
+          .filter(i => i !== null);
+        return {
+          questionText,
+          questionType: 'multi_select',
+          answers,
+          correctIndexes,
+          points,
+          explanation: q.explanation || ''
+        };
+      });
+
+      const payload = {
+        title: trimmedTitle,
+        description: formData.description,
+        lessonId: formData.lessonId || null,
+        assessmentType,
+        questions: normalizedQuestions
+      };
 
       if (editingQuiz) {
-        await quizManagementService.update(editingQuiz.quiz_id, formData);
-        setSuccess('Cập nhật quiz thành công!');
+        await quizManagementService.update(editingQuiz.quiz_id, payload);
+        setSuccess('Cập nhật bài kiểm tra thành công!');
       } else {
-        await quizManagementService.create(formData);
-        setSuccess('Tạo quiz thành công!');
+        await quizManagementService.create(payload);
+        setSuccess('Tạo bài kiểm tra thành công!');
       }
 
       handleClose();
@@ -175,10 +359,10 @@ const QuizzesManagement = () => {
   };
 
   const handleDelete = async (quizId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa quiz này?')) return;
+    if (!window.confirm('Bạn có chắc muốn xóa bài kiểm tra này?')) return;
     try {
       await quizManagementService.delete(quizId);
-      setSuccess('Xóa quiz thành công!');
+      setSuccess('Đã xóa bài kiểm tra');
       loadData();
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
@@ -199,10 +383,10 @@ const QuizzesManagement = () => {
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <QuizIcon fontSize="large" color="primary" />
-          Quản lý Quiz
+          Quản lý Bài kiểm tra
         </Typography>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenCreate} size="large">
-          Tạo Quiz mới
+          Tạo bài kiểm tra
         </Button>
       </Stack>
 
@@ -215,6 +399,7 @@ const QuizzesManagement = () => {
             <TableRow sx={{ bgcolor: 'primary.main' }}>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tiêu đề</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Loại</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Bài học</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Người tạo</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ngày tạo</TableCell>
@@ -224,51 +409,62 @@ const QuizzesManagement = () => {
           <TableBody>
             {quizzes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">Chưa có quiz nào</Typography>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">Chưa có bài kiểm tra nào</Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              quizzes.map((quiz) => (
-                <TableRow key={quiz.quiz_id} hover>
-                  <TableCell>{quiz.quiz_id}</TableCell>
-                  <TableCell><strong>{quiz.title}</strong></TableCell>
-                  <TableCell>
-                    {quiz.lesson_id ? (
-                      <Chip label={quiz.lesson_title || `Lesson #${quiz.lesson_id}`} size="small" />
-                    ) : (
-                      <Chip label="Quiz độc lập" color="info" size="small" />
-                    )}
-                  </TableCell>
-                  <TableCell>{quiz.creator_name || '—'}</TableCell>
-                  <TableCell>{new Date(quiz.created_at).toLocaleDateString('vi-VN')}</TableCell>
-                  <TableCell align="center">
-                    <Tooltip title="Xóa">
-                      <IconButton color="error" onClick={() => handleDelete(quiz.quiz_id)}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
+              quizzes.map((quiz) => {
+                const assessment = normalizeAssessmentType(quiz.assessment_type);
+                const typeMeta = ASSESSMENT_TYPES.find(t => t.value === assessment);
+                return (
+                  <TableRow key={quiz.quiz_id} hover>
+                    <TableCell>{quiz.quiz_id}</TableCell>
+                    <TableCell><strong>{quiz.title}</strong></TableCell>
+                    <TableCell>
+                      <Chip
+                        label={typeMeta?.label || 'Quiz'}
+                        size="small"
+                        sx={{ fontWeight: 600 }}
+                        color={assessment === 'quiz' ? 'primary' : assessment === 'multi_choice' ? 'warning' : 'success'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {quiz.lesson_id ? (
+                        <Chip label={quiz.lesson_title || `Lesson #${quiz.lesson_id}`} size="small" />
+                      ) : (
+                        <Chip label="Bài kiểm tra độc lập" color="info" size="small" />
+                      )}
+                    </TableCell>
+                    <TableCell>{quiz.creator_name || '—'}</TableCell>
+                    <TableCell>{new Date(quiz.created_at).toLocaleDateString('vi-VN')}</TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Xóa">
+                        <IconButton color="error" onClick={() => handleDelete(quiz.quiz_id)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={openDialog} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display:'flex', alignItems:'center', gap:1, fontWeight:'bold' }}>
-          {editingQuiz ? 'Chỉnh sửa Quiz' : 'Tạo Quiz mới'}
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          {editingQuiz ? 'Chỉnh sửa bài kiểm tra' : 'Tạo bài kiểm tra mới'}
         </DialogTitle>
-        <DialogContent dividers sx={{ bgcolor:'#fafbff' }}>
+        <DialogContent dividers sx={{ bgcolor: '#fafbff' }}>
           <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField
-              label="Tiêu đề Quiz"
+              label="Tiêu đề bài kiểm tra"
               fullWidth
               required
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
             />
             <TextField
               label="Mô tả"
@@ -276,16 +472,16 @@ const QuizzesManagement = () => {
               multiline
               rows={2}
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             />
             <FormControl fullWidth>
-              <InputLabel>Gắn vào Bài học (tùy chọn)</InputLabel>
+              <InputLabel>Gắn vào bài học (tùy chọn)</InputLabel>
               <Select
                 value={formData.lessonId || ''}
-                onChange={(e) => setFormData({ ...formData, lessonId: e.target.value || null })}
-                label="Gắn vào Bài học (tùy chọn)"
+                label="Gắn vào bài học (tùy chọn)"
+                onChange={(e) => setFormData(prev => ({ ...prev, lessonId: e.target.value || null }))}
               >
-                <MenuItem value="">-- Quiz độc lập --</MenuItem>
+                <MenuItem value="">— Bài kiểm tra độc lập —</MenuItem>
                 {lessons.map(l => (
                   <MenuItem key={l.lesson_id} value={l.lesson_id}>{l.title}</MenuItem>
                 ))}
@@ -293,75 +489,154 @@ const QuizzesManagement = () => {
             </FormControl>
 
             <Divider />
-            <Typography variant="h6" sx={{ fontWeight:'bold' }}>Câu hỏi</Typography>
-            <Typography variant="body2" color="text.secondary">Mỗi câu hỏi cần ít nhất 2 đáp án và chọn 1 đáp án đúng.</Typography>
-
-            {formData.questions.map((q, qIdx) => (
-              <Card key={qIdx} variant="outlined" sx={{ borderRadius:2, boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
-                <CardContent>
-                  <Stack spacing={2}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        Câu hỏi {qIdx + 1}
+            <Typography variant="h6" fontWeight="bold">Chọn loại bài kiểm tra</Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              {ASSESSMENT_TYPES.map(type => {
+                const selected = formData.assessmentType === type.value;
+                return (
+                  <Card
+                    key={type.value}
+                    onClick={() => handleAssessmentTypeChange(type.value)}
+                    sx={{
+                      cursor: 'pointer',
+                      flex: 1,
+                      borderRadius: 3,
+                      border: selected ? '2px solid transparent' : '1px solid rgba(0,0,0,0.08)',
+                      background: selected ? type.accent : 'white',
+                      color: selected ? 'white' : 'inherit',
+                      boxShadow: selected ? '0 10px 30px rgba(0,0,0,0.12)' : 'none',
+                      transition: 'all .2s ease',
+                      '&:hover': {
+                        boxShadow: '0 12px 32px rgba(0,0,0,0.16)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
+                  >
+                    <CardContent>
+                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                        {type.label}
                       </Typography>
-                      {formData.questions.length > 1 && (
-                        <IconButton size="small" color="error" onClick={() => removeQuestion(qIdx)}>
-                          <RemoveIcon />
-                        </IconButton>
-                      )}
-                    </Stack>
-                    <TextField
-                      label="Nội dung câu hỏi"
-                      fullWidth
-                      required
-                      multiline
-                      rows={2}
-                      value={q.questionText}
-                      onChange={(e) => updateQuestion(qIdx, 'questionText', e.target.value)}
-                    />
-                    <TextField
-                      label="Điểm"
-                      type="number"
-                      value={q.points}
-                      onChange={(e) => updateQuestion(qIdx, 'points', parseInt(e.target.value) || 1)}
-                      sx={{ width: '120px' }}
-                    />
-                    <FormLabel>Đáp án</FormLabel>
-                    {q.answers.map((ans, aIdx) => (
-                      <Stack key={aIdx} direction="row" spacing={1} alignItems="center">
-                        <FormControlLabel
-                          control={
-                            <Radio
-                              checked={ans.isCorrect}
-                              onChange={() => {
-                                const updated = [...formData.questions];
-                                updated[qIdx].answers.forEach((a, i) => a.isCorrect = i === aIdx);
-                                setFormData({ ...formData, questions: updated });
-                              }}
-                            />
-                          }
-                          label=""
-                        />
-                        <TextField
-                          placeholder={`Đáp án ${aIdx + 1}`}
-                          fullWidth
-                          value={ans.answerText}
-                          onChange={(e) => updateAnswer(qIdx, aIdx, 'answerText', e.target.value)}
-                        />
-                        {q.answers.length > 2 && (
-                          <IconButton size="small" onClick={() => removeAnswer(qIdx, aIdx)}>
-                            <RemoveIcon />
-                          </IconButton>
+                      <Typography variant="body2" sx={{ opacity: selected ? 0.9 : 0.7 }}>
+                        {type.description}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+
+            <Divider />
+            <Typography variant="h6" fontWeight="bold">Câu hỏi</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {formData.assessmentType === 'fill_blank'
+                ? 'Nhập câu hỏi và các đáp án hợp lệ mà hệ thống sẽ chấp nhận.'
+                : formData.assessmentType === 'multi_choice'
+                  ? 'Mỗi câu hỏi có thể có nhiều đáp án đúng, chọn bằng ô vuông.'
+                  : 'Mỗi câu hỏi cần ít nhất 2 đáp án và chỉ một đáp án đúng.'}
+            </Typography>
+
+            {formData.questions.map((q, qIdx) => {
+              const isFillBlank = formData.assessmentType === 'fill_blank';
+              const isMulti = formData.assessmentType === 'multi_choice';
+              return (
+                <Card key={qIdx} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 6px 16px rgba(24,63,122,0.06)' }}>
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          Câu hỏi {qIdx + 1}
+                        </Typography>
+                        {formData.questions.length > 1 && (
+                          <Tooltip title="Xóa câu hỏi">
+                            <IconButton size="small" color="error" onClick={() => removeQuestion(qIdx)}>
+                              <RemoveIcon />
+                            </IconButton>
+                          </Tooltip>
                         )}
                       </Stack>
-                    ))}
-                    <Button size="small" onClick={() => addAnswer(qIdx)}>+ Thêm đáp án</Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
 
-            <Button variant="outlined" onClick={addQuestion}>+ Thêm câu hỏi</Button>
+                      <TextField
+                        label="Nội dung câu hỏi"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        value={q.questionText}
+                        onChange={(e) => updateQuestionField(qIdx, 'questionText', e.target.value)}
+                      />
+
+                      <TextField
+                        label="Điểm"
+                        type="number"
+                        sx={{ width: 140 }}
+                        value={q.points}
+                        onChange={(e) => updateQuestionField(qIdx, 'points', parseInt(e.target.value, 10) || 1)}
+                      />
+
+                      {isFillBlank ? (
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle2" fontWeight="bold">Các đáp án chấp nhận</Typography>
+                          {(q.acceptedAnswers || ['']).map((ans, idx) => (
+                            <Stack direction="row" spacing={1} alignItems="center" key={idx}>
+                              <TextField
+                                placeholder={`Đáp án hợp lệ #${idx + 1}`}
+                                fullWidth
+                                value={ans}
+                                onChange={(e) => updateAcceptedAnswer(qIdx, idx, e.target.value)}
+                              />
+                              {(q.acceptedAnswers || []).length > 1 && (
+                                <IconButton size="small" onClick={() => removeAcceptedAnswer(qIdx, idx)}>
+                                  <RemoveIcon />
+                                </IconButton>
+                              )}
+                            </Stack>
+                          ))}
+                          <Button variant="outlined" size="small" onClick={() => addAcceptedAnswer(qIdx)}>
+                            + Thêm đáp án chấp nhận
+                          </Button>
+                        </Stack>
+                      ) : (
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle2" fontWeight="bold">Danh sách đáp án</Typography>
+                          {(q.answers || []).map((ans, aIdx) => (
+                            <Stack key={aIdx} direction="row" spacing={1} alignItems="center">
+                              {isMulti ? (
+                                <Checkbox
+                                  checked={Boolean(ans.isCorrect)}
+                                  onChange={(e) => toggleCorrectAnswer(qIdx, aIdx, e.target.checked)}
+                                />
+                              ) : (
+                                <Radio
+                                  checked={Boolean(ans.isCorrect)}
+                                  onChange={() => toggleCorrectAnswer(qIdx, aIdx, true)}
+                                />
+                              )}
+                              <TextField
+                                placeholder={`Đáp án ${aIdx + 1}`}
+                                fullWidth
+                                value={ans.answerText}
+                                onChange={(e) => updateAnswerField(qIdx, aIdx, 'answerText', e.target.value)}
+                              />
+                              {(q.answers || []).length > 2 && (
+                                <IconButton size="small" onClick={() => removeChoiceAnswer(qIdx, aIdx)}>
+                                  <RemoveIcon />
+                                </IconButton>
+                              )}
+                            </Stack>
+                          ))}
+                          <Button variant="outlined" size="small" onClick={() => addChoiceAnswer(qIdx)}>
+                            + Thêm đáp án
+                          </Button>
+                        </Stack>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              );
+            })}
+
+            <Button variant="contained" color="primary" onClick={addQuestion} sx={{ alignSelf: 'flex-start' }}>
+              + Thêm câu hỏi
+            </Button>
           </Stack>
         </DialogContent>
         <DialogActions>

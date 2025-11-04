@@ -13,11 +13,14 @@ export async function getQuizQuestions(lessonId) {
     SELECT 
       q.question_id,
       q.question_text,
-      'multiple_choice'::varchar(50) AS question_type,
+      COALESCE(NULLIF(q.question_type, ''), 'single_choice') AS question_type,
       COALESCE(q.points,1) AS points,
       q.options,
-      q.correct_index
+      q.correct_index,
+      q.answer_schema,
+      qu.assessment_type
     FROM quiz_questions q
+    JOIN quizzes qu ON qu.quiz_id = q.quiz_id
     WHERE q.quiz_id = $1
     ORDER BY COALESCE(q.position,1), q.question_id
   `;
@@ -31,12 +34,15 @@ export async function getQuizQuestionsByQuizId(quizId) {
     SELECT 
       q.question_id,
       q.question_text,
-      'multiple_choice'::varchar(50) AS question_type,
+      COALESCE(NULLIF(q.question_type, ''), 'single_choice') AS question_type,
       COALESCE(q.points,1) AS points,
       q.options,
       q.correct_index,
-      q.quiz_id
+      q.answer_schema,
+      q.quiz_id,
+      qu.assessment_type
     FROM quiz_questions q
+    JOIN quizzes qu ON qu.quiz_id = q.quiz_id
     WHERE q.quiz_id = $1
     ORDER BY COALESCE(q.position,1), q.question_id
   `;

@@ -15,11 +15,14 @@ function ensureCanEdit(user) {
   if (!['admin', 'teacher'].includes(role)) throw new Error('Forbidden');
 }
 
-function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
+const DEFAULT_ASSESSMENT_TYPES = new Set(['quiz', 'multi_choice', 'fill_blank']);
+
+function normalizeQuestions(rawQuestions, { requireAtLeastOne = true, assessmentType = 'quiz' } = {}) {
   if (!Array.isArray(rawQuestions)) {
     if (requireAtLeastOne) throw new Error('Invalid quiz questions');
     return null;
   }
+  const quizType = DEFAULT_ASSESSMENT_TYPES.has(assessmentType) ? assessmentType : 'quiz';
   const questions = [];
 
   for (const q of rawQuestions) {
@@ -28,10 +31,38 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
       continue;
     }
 
+    const points = Number.isFinite(Number(q.points)) && Number(q.points) > 0 ? Number(q.points) : 1;
+    const explanation = q.explanation || null;
+
+    if (quizType === 'fill_blank' || (q.questionType === 'fill_blank')) {
+      const rawAccepted = Array.isArray(q.acceptedAnswers)
+        ? q.acceptedAnswers
+        : Array.isArray(q.answers)
+          ? q.answers.map(a => a.answerText || a.text)
+          : [];
+      const acceptedAnswers = rawAccepted
+        .map(ans => String(ans || '').trim())
+        .filter(Boolean);
+      if (!acceptedAnswers.length) {
+        continue;
+      }
+      questions.push({
+        questionText,
+        questionType: 'fill_blank',
+        options: null,
+        correctIndex: null,
+        answerSchema: { acceptedAnswers },
+        explanation,
+        points
+      });
+      continue;
+    }
+
+    // Determine answers/options for multiple-choice variants
     let answers = [];
     if (Array.isArray(q.answers) && q.answers.length) {
       answers = q.answers
-        .map((ans, idx) => ({
+        .map(ans => ({
           text: String(ans?.answerText ?? ans?.text ?? '').trim(),
           isCorrect: Boolean(ans?.isCorrect || ans?.correct)
         }))
@@ -42,7 +73,9 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
       answers = q.options
         .map((opt, idx) => ({
           text: String(opt ?? '').trim(),
-          isCorrect: idx === q.correctIndex
+          isCorrect: Array.isArray(q.correctIndexes)
+            ? q.correctIndexes.includes(idx)
+            : idx === q.correctIndex
         }))
         .filter(ans => ans.text);
     }
@@ -51,6 +84,24 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
       continue;
     }
 
+    if (quizType === 'multi_choice' || q.questionType === 'multi_select') {
+      const correctIndexes = answers
+        .map((ans, idx) => (ans.isCorrect ? idx : null))
+        .filter(idx => idx !== null);
+      const safeCorrectIndexes = correctIndexes.length ? correctIndexes : [0];
+      questions.push({
+        questionText,
+        questionType: 'multi_select',
+        options: answers.map(ans => ans.text),
+        correctIndex: null,
+        answerSchema: { correctIndexes: safeCorrectIndexes },
+        explanation,
+        points
+      });
+      continue;
+    }
+
+    // default single-choice quiz question
     let correctIndex = answers.findIndex(ans => ans.isCorrect);
     if (correctIndex < 0) {
       correctIndex = 0;
@@ -59,10 +110,12 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
 
     questions.push({
       questionText,
+      questionType: 'single_choice',
       options: answers.map(ans => ans.text),
       correctIndex,
-      explanation: q.explanation || null,
-      points: Number.isFinite(Number(q.points)) && Number(q.points) > 0 ? Number(q.points) : 1
+      answerSchema: null,
+      explanation,
+      points
     });
   }
 
@@ -74,9 +127,10 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true } = {}) {
   return questions;
 }
 
-export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty }, user) {
+export async function createQuizSvc({ title, description, lessonId, questions, timeLimit, difficulty, assessmentType = 'quiz' }, user) {
   ensureCanEdit(user);
-  const normQuestions = normalizeQuestions(questions);
+  const safeAssessment = DEFAULT_ASSESSMENT_TYPES.has(assessmentType) ? assessmentType : 'quiz';
+  const normQuestions = normalizeQuestions(questions, { assessmentType: safeAssessment });
   const result = await createQuizWithQuestions({
     title,
     description,
@@ -84,13 +138,14 @@ export async function createQuizSvc({ title, description, lessonId, questions, t
     createdBy: user.id,
     timeLimit,
     difficulty,
+    assessmentType: safeAssessment,
     questions: normQuestions
   });
   try { await publishNewQuizNotification({ ...result, quiz_id: result.quiz_id, lesson_id: result.lesson_id }); } catch {}
   return result;
 }
 
-export async function updateQuizSvc(quizId, { title, description, lessonId, timeLimit, difficulty, questions }, user) {
+export async function updateQuizSvc(quizId, { title, description, lessonId, timeLimit, difficulty, questions, assessmentType = 'quiz' }, user) {
   ensureCanEdit(user);
   
   const existing = await getQuizById(quizId);
@@ -100,12 +155,13 @@ export async function updateQuizSvc(quizId, { title, description, lessonId, time
   const role = (user.role || '').toLowerCase();
   if (role !== 'admin' && createdBy !== user.id) throw new Error('Forbidden');
 
-  const payload = { title, description, lessonId: lessonId || null, difficulty, timeLimit };
+  const safeAssessment = DEFAULT_ASSESSMENT_TYPES.has(assessmentType) ? assessmentType : (existing.assessment_type || 'quiz');
+  const payload = { title, description, lessonId: lessonId || null, difficulty, timeLimit, assessmentType: safeAssessment };
 
   if (questions === undefined) {
     await updateQuizMetadata(quizId, payload);
   } else {
-    const normalizedQuestions = normalizeQuestions(questions, { requireAtLeastOne: true });
+    const normalizedQuestions = normalizeQuestions(questions, { requireAtLeastOne: true, assessmentType: safeAssessment });
     await updateQuizWithQuestions(quizId, payload, normalizedQuestions);
   }
 

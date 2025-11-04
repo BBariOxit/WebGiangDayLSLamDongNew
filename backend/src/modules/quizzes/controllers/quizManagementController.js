@@ -14,11 +14,14 @@ const createQuizSchema = Joi.object({
   lessonId: Joi.number().integer().allow(null),
   difficulty: Joi.string().allow('', null),
   timeLimit: Joi.number().integer().min(1).allow(null),
+  assessmentType: Joi.string().valid('quiz', 'multi_choice', 'fill_blank').default('quiz'),
   questions: Joi.array().items(
     Joi.object({
       questionText: Joi.string().required(),
       options: Joi.array().items(Joi.string().min(1)).min(2),
       correctIndex: Joi.number().integer().min(0),
+      correctIndexes: Joi.array().items(Joi.number().integer().min(0)),
+      acceptedAnswers: Joi.array().items(Joi.string().min(1)).min(1),
       // Back-compat: allow answers[]
       answers: Joi.array().items(
         Joi.object({ answerText: Joi.string().required(), isCorrect: Joi.boolean().required() })

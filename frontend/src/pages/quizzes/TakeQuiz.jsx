@@ -1,50 +1,73 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import { quizApi } from '../../api/quizApi';
-import { Box, Container, Paper, Typography, LinearProgress, RadioGroup, FormControlLabel, Radio, Button, Chip } from '@mui/material';
+import {
+  Box,
+  Button,
+  Chip,
+  Checkbox,
+  Container,
+  FormControlLabel,
+  FormGroup,
+  LinearProgress,
+  Paper,
+  Radio,
+  RadioGroup,
+  TextField,
+  Typography
+} from '@mui/material';
 import { Timer as TimerIcon } from '@mui/icons-material';
+
+const QUESTION_TYPE_LABEL = {
+  single_choice: 'Trắc nghiệm 1 đáp án',
+  multi_select: 'Chọn nhiều đáp án',
+  fill_blank: 'Điền vào chỗ trống'
+};
 
 const TakeQuiz = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [quiz, setQuiz] = React.useState(null);
-  const [index, setIndex] = React.useState(0);
-  const [answers, setAnswers] = React.useState({});
-  const [timeLeft, setTimeLeft] = React.useState(0);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
+  useAuth(); // ensure auth hook runs for protected routes
 
-  React.useEffect(() => {
+  const [quiz, setQuiz] = useState(null);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
-        // Load quiz meta (public)
         const meta = await quizApi.getPublicQuizById(id);
-        if (!meta) throw new Error('Không tìm thấy quiz');
-        // Load questions by quizId directly
+        if (!meta) throw new Error('Không tìm thấy bài kiểm tra');
         const bundle = await quizApi.getQuizQuestionsByQuizId(id);
-        const q = {
+
+        const hydrated = {
           id: meta.quiz_id,
           title: meta.title,
           description: meta.description,
-          timeLimit: meta.time_limit || 10,
+          timeLimit: typeof meta.time_limit === 'number' ? meta.time_limit : null,
           lessonId: meta.lesson_id,
-          questions: (bundle?.questions || []).map(b => ({
-            id: b.questionId || b.question_id,
-            text: b.questionText || b.question_text,
-            options: b.options || []
+          assessmentType: meta.assessment_type || 'quiz',
+          questions: (bundle?.questions || []).map((b, idx) => ({
+            id: b.questionId || b.question_id || idx,
+            text: b.questionText || b.question_text || 'Câu hỏi',
+            options: Array.isArray(b.options) ? b.options : [],
+            questionType: (b.questionType || b.question_type || 'single_choice').toLowerCase()
           }))
         };
+
         if (mounted) {
-          setQuiz(q);
-          setTimeLeft(q.timeLimit * 60);
+          setQuiz(hydrated);
+          setTimeLeft(hydrated.timeLimit ? hydrated.timeLimit * 60 : 0);
         }
-      } catch (e) {
-        if (mounted) setError(e.message || 'Lỗi tải quiz');
+      } catch (err) {
+        if (mounted) setError(err.message || 'Không thể tải bài kiểm tra');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -52,39 +75,66 @@ const TakeQuiz = () => {
     return () => { mounted = false; };
   }, [id]);
 
-  React.useEffect(() => {
-    if (timeLeft <= 0) return;
-    const t = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    return () => clearTimeout(t);
+  useEffect(() => {
+    if (!timeLeft) return undefined;
+    if (timeLeft <= 0) return undefined;
+    const timer = setTimeout(() => setTimeLeft((prev) => Math.max(prev - 1, 0)), 1000);
+    return () => clearTimeout(timer);
   }, [timeLeft]);
 
-  // Auto-submit when time runs out (once)
-  React.useEffect(() => {
-    if (!quiz) return;
-    if (timeLeft === 0 && !submitting) {
-      // submit automatically
-      (async () => {
-        try {
-          setSubmitting(true);
-          const payloadAnswers = quiz.questions.map(qq => ({
-            questionId: Number(qq.id),
-            selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
-          }));
-          const result = await quizApi.submitAttemptByQuizId(quiz.id, payloadAnswers);
-          navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
-        } catch (e) {
-          setError(e.message || 'Nộp bài thất bại');
-          setSubmitting(false);
-        }
-      })();
-    }
-  }, [timeLeft, quiz, submitting, answers, navigate]);
+  const buildPayloadAnswers = useCallback(() => {
+    if (!quiz) return [];
+    return quiz.questions.map((qq) => {
+      const questionType = (qq.questionType || '').toLowerCase();
+      const rawValue = answers[qq.id];
+
+      if (questionType === 'multi_select') {
+        const selected = Array.isArray(rawValue) ? rawValue : [];
+        return {
+          questionId: Number(qq.id),
+          selectedAnswers: selected.map(Number).filter(Number.isFinite)
+        };
+      }
+
+      if (questionType === 'fill_blank') {
+        return {
+          questionId: Number(qq.id),
+          writtenAnswer: typeof rawValue === 'string' ? rawValue : ''
+        };
+      }
+
+      return {
+        questionId: Number(qq.id),
+        selectedAnswers: rawValue !== undefined ? [Number(rawValue)] : []
+      };
+    });
+  }, [quiz, answers]);
+
+  useEffect(() => {
+    if (!quiz || submitting) return;
+    if (timeLeft !== 0) return;
+    (async () => {
+      try {
+        setSubmitting(true);
+        const result = await quizApi.submitAttemptByQuizId(quiz.id, buildPayloadAnswers());
+        navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz } });
+      } catch (err) {
+        setError(err.message || 'Nộp bài thất bại');
+        setSubmitting(false);
+      }
+    })();
+  }, [timeLeft, quiz, submitting, buildPayloadAnswers, navigate]);
+
+  const currentQuestion = useMemo(() => {
+    if (!quiz) return null;
+    return quiz.questions[index] || null;
+  }, [quiz, index]);
 
   if (loading) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
-        <Paper sx={{ p:3 }}>
-          <Typography>Đang tải quiz...</Typography>
+        <Paper sx={{ p: 3 }}>
+          <Typography>Đang tải bài kiểm tra...</Typography>
         </Paper>
       </Container>
     );
@@ -93,62 +143,152 @@ const TakeQuiz = () => {
   if (!quiz || error) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
-        <Paper sx={{ p:3 }}>
-          <Typography>{error || 'Không tìm thấy quiz.'}</Typography>
+        <Paper sx={{ p: 3 }}>
+          <Typography>{error || 'Không tìm thấy bài kiểm tra.'}</Typography>
         </Paper>
       </Container>
     );
   }
 
-  const q = quiz.questions[index];
   const progress = ((index + 1) / quiz.questions.length) * 100;
+  const questionType = (currentQuestion?.questionType || 'single_choice').toLowerCase();
+  const questionTypeLabel = QUESTION_TYPE_LABEL[questionType] || 'Trắc nghiệm';
+
+  const handleSelectSingle = (questionId, optionIndex) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
+  };
+
+  const handleToggleMulti = (questionId, optionIndex, checked) => {
+    setAnswers((prev) => {
+      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
+      if (checked) {
+        if (!current.includes(optionIndex)) current.push(optionIndex);
+      } else {
+        const idx = current.indexOf(optionIndex);
+        if (idx >= 0) current.splice(idx, 1);
+      }
+      return { ...prev, [questionId]: current };
+    });
+  };
+
+  const handleChangeFillBlank = (questionId, text) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: text }));
+  };
+
+  const renderAnswerInputs = () => {
+    if (!currentQuestion) return null;
+
+    if (questionType === 'multi_select') {
+      const selected = Array.isArray(answers[currentQuestion.id]) ? answers[currentQuestion.id] : [];
+      return (
+        <FormGroup>
+          {(currentQuestion.options || []).map((opt, idx) => (
+            <FormControlLabel
+              key={idx}
+              control={
+                <Checkbox
+                  checked={selected.includes(idx)}
+                  onChange={(event) => handleToggleMulti(currentQuestion.id, idx, event.target.checked)}
+                />
+              }
+              label={opt}
+              sx={{ mb: 1 }}
+            />
+          ))}
+        </FormGroup>
+      );
+    }
+
+    if (questionType === 'fill_blank') {
+      return (
+        <TextField
+          fullWidth
+          placeholder="Nhập câu trả lời của bạn"
+          value={answers[currentQuestion.id] ?? ''}
+          onChange={(event) => handleChangeFillBlank(currentQuestion.id, event.target.value)}
+        />
+      );
+    }
+
+    return (
+      <RadioGroup
+        value={answers[currentQuestion.id] ?? ''}
+        onChange={(event) => handleSelectSingle(currentQuestion.id, Number(event.target.value))}
+      >
+        {(currentQuestion.options || []).map((opt, idx) => (
+          <FormControlLabel key={idx} value={idx} control={<Radio />} label={opt} sx={{ mb: 1 }} />
+        ))}
+      </RadioGroup>
+    );
+  };
 
   const submit = async () => {
-    // Build answers payload: [{ questionId, selectedAnswers: [index] }]
-    const payloadAnswers = quiz.questions.map(qq => ({
-      questionId: Number(qq.id),
-      selectedAnswers: (answers[qq.id] !== undefined) ? [Number(answers[qq.id])] : []
-    }));
     try {
       setSubmitting(true);
-      const result = await quizApi.submitAttemptByQuizId(quiz.id, payloadAnswers);
-      navigate(`/quizzes/results/${quiz.id}` , { state: { result, quiz } });
-    } catch (e) {
-      setError(e.message || 'Nộp bài thất bại');
+      const result = await quizApi.submitAttemptByQuizId(quiz.id, buildPayloadAnswers());
+      navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz } });
+    } catch (err) {
+      setError(err.message || 'Nộp bài thất bại');
       setSubmitting(false);
     }
   };
 
-  const format = (s) => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  const formattedTime = (seconds) => {
+    if (!seconds || seconds < 0) return '00:00';
+    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const ss = String(seconds % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  };
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper sx={{ p:3, mb:3 }}>
-        <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb:2 }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Box>
             <Typography variant="h6" fontWeight="bold">{quiz.title}</Typography>
-            <Typography variant="body2" color="text.secondary">Câu {index+1}/{quiz.questions.length}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Câu {index + 1}/{quiz.questions.length}
+            </Typography>
           </Box>
-          <Chip icon={<TimerIcon/>} label={format(timeLeft)} color={timeLeft < 60 ? 'error' : 'primary'} />
+          {quiz.timeLimit ? (
+            <Chip
+              icon={<TimerIcon />}
+              label={formattedTime(timeLeft)}
+              color={timeLeft <= 60 ? 'error' : 'primary'}
+            />
+          ) : null}
         </Box>
         <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4 }} />
       </Paper>
 
-      <Paper sx={{ p:3, mb:3 }}>
-        <Typography variant="h6" fontWeight="bold" sx={{ mb:2 }}>{q.text}</Typography>
-        <RadioGroup value={answers[q.id] ?? ''} onChange={(e)=> setAnswers(a => ({...a, [q.id]: Number(e.target.value)}))}>
-          {q.options.map((opt, i) => (
-            <FormControlLabel key={i} value={i} control={<Radio/>} label={opt} sx={{ mb:1 }} />
-          ))}
-        </RadioGroup>
+      {quiz.description && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="body2" color="text.secondary">{quiz.description}</Typography>
+        </Paper>
+      )}
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+          <Chip size="small" label={questionTypeLabel} color="secondary" />
+        </Box>
+        <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+          {currentQuestion?.text}
+        </Typography>
+        {renderAnswerInputs()}
       </Paper>
 
-      <Box sx={{ display:'flex', justifyContent:'space-between' }}>
-        <Button variant="outlined" disabled={index===0} onClick={()=>setIndex(i=>i-1)}>Câu trước</Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Button variant="outlined" disabled={index === 0} onClick={() => setIndex((prev) => prev - 1)}>
+          Câu trước
+        </Button>
         {index === quiz.questions.length - 1 ? (
-          <Button variant="contained" onClick={submit} disabled={submitting}>{submitting ? 'Đang nộp...' : 'Nộp bài'}</Button>
+          <Button variant="contained" onClick={submit} disabled={submitting}>
+            {submitting ? 'Đang nộp...' : 'Nộp bài'}
+          </Button>
         ) : (
-          <Button variant="contained" onClick={()=>setIndex(i=>i+1)}>Câu tiếp theo</Button>
+          <Button variant="contained" onClick={() => setIndex((prev) => prev + 1)}>
+            Câu tiếp theo
+          </Button>
         )}
       </Box>
     </Container>

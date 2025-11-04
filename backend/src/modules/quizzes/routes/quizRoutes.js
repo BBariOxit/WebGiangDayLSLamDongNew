@@ -40,7 +40,8 @@ router.get('/public/list', async (req, res) => {
       time_limit: r.time_limit,
       created_at: r.created_at,
       creator_name: r.creator_name,
-      lesson_title: r.lesson_title
+      lesson_title: r.lesson_title,
+      assessment_type: r.assessment_type || 'quiz'
     }));
     res.json({ success: true, data });
   } catch (e) {
@@ -61,9 +62,11 @@ router.get('/public/:id', async (req, res) => {
       difficulty: quiz.difficulty,
       time_limit: quiz.time_limit,
       created_at: quiz.created_at,
+      assessment_type: quiz.assessment_type || 'quiz',
       questions: (quiz.questions || []).map(q => ({
         question_id: q.question_id,
         question_text: q.question_text,
+        question_type: q.question_type || 'single_choice',
         options: q.options || [],
         explanation: q.explanation || null,
         position: q.position
