@@ -138,17 +138,35 @@ export async function getQuizWithQuestions(quizId) {
   `, [quizId]);
   if (!quizMeta.rows[0]) return null;
   const quiz = quizMeta.rows[0];
-  const questions = await query(`
-    SELECT question_id, question_text, options, correct_index, explanation, position, points, question_type, answer_schema
-    FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id
-  `, [quizId]);
-  return {
-    ...quiz,
-    questions: questions.rows.map(row => ({
-      ...row,
-      answer_schema: row.answer_schema ? row.answer_schema : null
-    }))
-  };
+  try {
+    const questions = await query(`
+      SELECT question_id, question_text, options, correct_index, explanation, position, points, question_type, answer_schema
+      FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id
+    `, [quizId]);
+    return {
+      ...quiz,
+      questions: questions.rows.map(row => ({
+        ...row,
+        answer_schema: row.answer_schema ? row.answer_schema : null
+      }))
+    };
+  } catch (error) {
+    if (error?.code !== PG_UNDEFINED_COLUMN) throw error;
+    console.warn('[quizManagementRepo] Legacy schema detected for getQuizWithQuestions. Falling back. Please run migration 017.');
+    const fallbackQuestions = await query(`
+      SELECT question_id, question_text, options, correct_index, explanation, position, points
+      FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id
+    `, [quizId]);
+    return {
+      ...quiz,
+      assessment_type: quiz.assessment_type || 'quiz',
+      questions: fallbackQuestions.rows.map(row => ({
+        ...row,
+        question_type: 'single_choice',
+        answer_schema: null
+      }))
+    };
+  }
 }
 
 export async function deleteQuizAndQuestions(quizId) {

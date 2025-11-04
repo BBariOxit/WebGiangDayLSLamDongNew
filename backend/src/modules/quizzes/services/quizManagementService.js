@@ -16,6 +16,7 @@ function ensureCanEdit(user) {
 }
 
 const DEFAULT_ASSESSMENT_TYPES = new Set(['quiz', 'multi_choice', 'fill_blank']);
+export const SCHEMA_OUTDATED_ERROR = 'DB_SCHEMA_OUTDATED';
 
 function normalizeQuestions(rawQuestions, { requireAtLeastOne = true, assessmentType = 'quiz' } = {}) {
   if (!Array.isArray(rawQuestions)) {
@@ -131,16 +132,26 @@ export async function createQuizSvc({ title, description, lessonId, questions, t
   ensureCanEdit(user);
   const safeAssessment = DEFAULT_ASSESSMENT_TYPES.has(assessmentType) ? assessmentType : 'quiz';
   const normQuestions = normalizeQuestions(questions, { assessmentType: safeAssessment });
-  const result = await createQuizWithQuestions({
-    title,
-    description,
-    lessonId: lessonId || null,
-    createdBy: user.id,
-    timeLimit,
-    difficulty,
-    assessmentType: safeAssessment,
-    questions: normQuestions
-  });
+  let result;
+  try {
+    result = await createQuizWithQuestions({
+      title,
+      description,
+      lessonId: lessonId || null,
+      createdBy: user.id,
+      timeLimit,
+      difficulty,
+      assessmentType: safeAssessment,
+      questions: normQuestions
+    });
+  } catch (error) {
+    if (error?.code === '42703') {
+      const schemaErr = new Error(SCHEMA_OUTDATED_ERROR);
+      schemaErr.code = SCHEMA_OUTDATED_ERROR;
+      throw schemaErr;
+    }
+    throw error;
+  }
   try { await publishNewQuizNotification({ ...result, quiz_id: result.quiz_id, lesson_id: result.lesson_id }); } catch {}
   return result;
 }
@@ -158,11 +169,20 @@ export async function updateQuizSvc(quizId, { title, description, lessonId, time
   const safeAssessment = DEFAULT_ASSESSMENT_TYPES.has(assessmentType) ? assessmentType : (existing.assessment_type || 'quiz');
   const payload = { title, description, lessonId: lessonId || null, difficulty, timeLimit, assessmentType: safeAssessment };
 
-  if (questions === undefined) {
-    await updateQuizMetadata(quizId, payload);
-  } else {
-    const normalizedQuestions = normalizeQuestions(questions, { requireAtLeastOne: true, assessmentType: safeAssessment });
-    await updateQuizWithQuestions(quizId, payload, normalizedQuestions);
+  try {
+    if (questions === undefined) {
+      await updateQuizMetadata(quizId, payload);
+    } else {
+      const normalizedQuestions = normalizeQuestions(questions, { requireAtLeastOne: true, assessmentType: safeAssessment });
+      await updateQuizWithQuestions(quizId, payload, normalizedQuestions);
+    }
+  } catch (error) {
+    if (error?.code === '42703') {
+      const schemaErr = new Error(SCHEMA_OUTDATED_ERROR);
+      schemaErr.code = SCHEMA_OUTDATED_ERROR;
+      throw schemaErr;
+    }
+    throw error;
   }
 
   return { success: true, quizId };

@@ -4,7 +4,8 @@ import {
   updateQuizSvc,
   deleteQuizSvc,
   listQuizzesSvc,
-  getQuizDetailSvc
+  getQuizDetailSvc,
+  SCHEMA_OUTDATED_ERROR
 } from '../services/quizManagementService.js';
 import { ok, created, fail, notFound, forbidden } from '../../../utils/response.js';
 
@@ -37,6 +38,9 @@ export async function createQuiz(req, res) {
     const quiz = await createQuizSvc(value, req.user);
     created(res, quiz);
   } catch (e) {
+    if (e.code === SCHEMA_OUTDATED_ERROR) {
+      return fail(res, 400, 'Cần cập nhật cấu trúc cơ sở dữ liệu (chạy migration 017_assessment_types) trước khi tạo bài kiểm tra.');
+    }
     if (e.message === 'Forbidden') return forbidden(res);
     fail(res, 400, e.message);
   }
@@ -50,6 +54,9 @@ export async function updateQuiz(req, res) {
     const quiz = await updateQuizSvc(quizId, value, req.user);
     ok(res, quiz);
   } catch (e) {
+    if (e.code === SCHEMA_OUTDATED_ERROR) {
+      return fail(res, 400, 'Cần cập nhật cấu trúc cơ sở dữ liệu (chạy migration 017_assessment_types) trước khi cập nhật bài kiểm tra.');
+    }
     if (e.message === 'Forbidden') return forbidden(res);
     if (e.message === 'Not found') return notFound(res);
     fail(res, 400, e.message);

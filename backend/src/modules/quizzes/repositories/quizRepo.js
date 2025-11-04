@@ -1,5 +1,21 @@
 import { query } from '../../../config/pool.js';
 
+const PG_UNDEFINED_COLUMN = '42703';
+
+function mapLegacyQuestion(row) {
+  return {
+    question_id: row.question_id,
+    question_text: row.question_text,
+    question_type: 'single_choice',
+    points: row.points ?? 1,
+    options: row.options,
+    correct_index: row.correct_index,
+    answer_schema: null,
+    quiz_id: row.quiz_id,
+    assessment_type: row.assessment_type ?? 'quiz'
+  };
+}
+
 async function getQuizIdByLesson(lessonId) {
   const r = await query('SELECT quiz_id FROM quizzes WHERE lesson_id=$1 ORDER BY quiz_id DESC LIMIT 1', [lessonId]);
   return r.rows[0]?.quiz_id || null;
@@ -24,9 +40,26 @@ export async function getQuizQuestions(lessonId) {
     WHERE q.quiz_id = $1
     ORDER BY COALESCE(q.position,1), q.question_id
   `;
-  const r = await query(sql, [quizId]);
-  // Attach resolved quizId to rows for later
-  return r.rows.map(row => ({ ...row, quiz_id: quizId }));
+  try {
+    const r = await query(sql, [quizId]);
+    return r.rows.map(row => ({ ...row, quiz_id: quizId }));
+  } catch (error) {
+    if (error?.code !== PG_UNDEFINED_COLUMN) throw error;
+    console.warn('[quizRepo] Legacy schema detected for getQuizQuestions. Falling back. Please run migration 017.');
+    const legacySql = `
+      SELECT q.question_id, q.question_text, q.options, q.correct_index, q.quiz_id, COALESCE(qu.lesson_id, $1) AS lesson_id
+      FROM quiz_questions q
+      JOIN quizzes qu ON qu.quiz_id = q.quiz_id
+      WHERE q.quiz_id = $1
+      ORDER BY q.question_id
+    `;
+    const legacyResult = await query(legacySql, [quizId]);
+    return legacyResult.rows.map(row => ({
+      ...mapLegacyQuestion(row),
+      quiz_id: quizId,
+      assessment_type: 'quiz'
+    }));
+  }
 }
 
 export async function getQuizQuestionsByQuizId(quizId) {
@@ -46,8 +79,21 @@ export async function getQuizQuestionsByQuizId(quizId) {
     WHERE q.quiz_id = $1
     ORDER BY COALESCE(q.position,1), q.question_id
   `;
-  const r = await query(sql, [quizId]);
-  return r.rows;
+  try {
+    const r = await query(sql, [quizId]);
+    return r.rows;
+  } catch (error) {
+    if (error?.code !== PG_UNDEFINED_COLUMN) throw error;
+    console.warn('[quizRepo] Legacy schema detected for getQuizQuestionsByQuizId. Falling back. Please run migration 017.');
+    const legacySql = `
+      SELECT q.question_id, q.question_text, q.options, q.correct_index, q.quiz_id
+      FROM quiz_questions q
+      WHERE q.quiz_id = $1
+      ORDER BY q.question_id
+    `;
+    const legacyResult = await query(legacySql, [quizId]);
+    return legacyResult.rows.map(mapLegacyQuestion);
+  }
 }
 
 export async function saveQuizAttempt({ lessonId, userId, score, answers }) {
