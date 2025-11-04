@@ -33,7 +33,7 @@ const TakeQuiz = () => {
   const [quiz, setQuiz] = useState(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({});
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -64,7 +64,7 @@ const TakeQuiz = () => {
 
         if (mounted) {
           setQuiz(hydrated);
-          setTimeLeft(hydrated.timeLimit ? hydrated.timeLimit * 60 : 0);
+          setTimeLeft(hydrated.timeLimit ? hydrated.timeLimit * 60 : null);
         }
       } catch (err) {
         if (mounted) setError(err.message || 'Không thể tải bài kiểm tra');
@@ -76,7 +76,7 @@ const TakeQuiz = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!timeLeft) return undefined;
+    if (timeLeft === null) return undefined;
     if (timeLeft <= 0) return undefined;
     const timer = setTimeout(() => setTimeLeft((prev) => Math.max(prev - 1, 0)), 1000);
     return () => clearTimeout(timer);
@@ -111,8 +111,9 @@ const TakeQuiz = () => {
   }, [quiz, answers]);
 
   useEffect(() => {
-    if (!quiz || submitting) return;
-    if (timeLeft !== 0) return;
+  if (!quiz || submitting) return;
+  if (!quiz.timeLimit) return;
+  if (timeLeft !== 0) return;
     (async () => {
       try {
         setSubmitting(true);
@@ -234,7 +235,8 @@ const TakeQuiz = () => {
   };
 
   const formattedTime = (seconds) => {
-    if (!seconds || seconds < 0) return '00:00';
+  if (seconds === null || Number.isNaN(seconds)) return '00:00';
+  if (seconds <= 0) return '00:00';
     const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
     const ss = String(seconds % 60).padStart(2, '0');
     return `${mm}:${ss}`;
