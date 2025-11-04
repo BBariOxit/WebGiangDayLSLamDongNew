@@ -121,7 +121,9 @@ const QuizzesManagement = () => {
       setQuizzes(quizRes.data || []);
       setLessons(lessonRes.data || []);
     } catch (e) {
-      setError('Không thể tải dữ liệu: ' + e.message);
+      const details = e.response?.data?.error || e.message;
+      console.error('Không thể tải danh sách bài kiểm tra', e);
+      setError('Không thể tải dữ liệu: ' + details);
     } finally {
       setLoading(false);
     }

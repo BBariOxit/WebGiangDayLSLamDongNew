@@ -1,5 +1,45 @@
 import { query, getPool } from '../../../config/pool.js';
 
+const PG_UNDEFINED_COLUMN = '42703';
+
+function toNullableInt(value) {
+  if (value === undefined || value === null) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function buildListQuery({ createdBy, lessonId, standalone }, includeAssessmentColumn = true) {
+  let sql = `
+    SELECT q.quiz_id, q.title, q.description, q.lesson_id, q.created_by, q.created_at, q.difficulty, q.time_limit,
+           ${includeAssessmentColumn ? 'q.assessment_type' : `'quiz'::varchar AS assessment_type`},
+           u.full_name as creator_name, l.title as lesson_title
+    FROM quizzes q
+    LEFT JOIN users u ON u.user_id = q.created_by
+    LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+    WHERE 1=1
+  `;
+
+  const params = [];
+  let idx = 1;
+
+  if (createdBy !== null) {
+    sql += ` AND q.created_by = $${idx++}`;
+    params.push(createdBy);
+  }
+
+  if (lessonId !== null) {
+    sql += ` AND q.lesson_id = $${idx++}`;
+    params.push(lessonId);
+  }
+
+  if (standalone) {
+    sql += ' AND q.lesson_id IS NULL';
+  }
+
+  sql += ' ORDER BY q.created_at DESC LIMIT 100';
+  return { sql, params };
+}
+
 export async function createQuizWithQuestions({
   title,
   description,
@@ -66,35 +106,29 @@ export async function getQuizById(quizId) {
 }
 
 export async function listQuizzes({ createdBy, lessonId, standalone }) {
-  let sql = `
-    SELECT q.quiz_id, q.title, q.description, q.lesson_id, q.created_by, q.created_at, q.difficulty, q.time_limit, q.assessment_type,
-           u.full_name as creator_name, l.title as lesson_title
-    FROM quizzes q
-    LEFT JOIN users u ON u.user_id = q.created_by
-    LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
-    WHERE 1=1
-  `;
-  const params = [];
-  let idx = 1;
-  
-  if (createdBy) {
-    sql += ` AND q.created_by = $${idx++}`;
-    params.push(createdBy);
+  const normalized = {
+    createdBy: toNullableInt(createdBy),
+    lessonId: toNullableInt(lessonId),
+    standalone: standalone === true || standalone === '1' || standalone === 1
+  };
+
+  const primaryQuery = buildListQuery(normalized, true);
+
+  try {
+    const r = await query(primaryQuery.sql, primaryQuery.params);
+    return r.rows;
+  } catch (error) {
+    if (error?.code === PG_UNDEFINED_COLUMN) {
+      console.warn('[quizManagementRepo] Missing assessment_type column, falling back for compatibility. Please run migration 017.');
+      const fallbackQuery = buildListQuery(normalized, false);
+      const fallbackResult = await query(fallbackQuery.sql, fallbackQuery.params);
+      return fallbackResult.rows.map(row => ({
+        ...row,
+        assessment_type: row.assessment_type || 'quiz'
+      }));
+    }
+    throw error;
   }
-  
-  if (lessonId !== null && lessonId !== undefined) {
-    sql += ` AND q.lesson_id = $${idx++}`;
-    params.push(lessonId);
-  }
-  
-  if (standalone) {
-    sql += ` AND q.lesson_id IS NULL`;
-  }
-  
-  sql += ` ORDER BY q.created_at DESC LIMIT 100`;
-  
-  const r = await query(sql, params);
-  return r.rows;
 }
 
 export async function getQuizWithQuestions(quizId) {
