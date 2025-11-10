@@ -41,7 +41,8 @@ router.get('/public/list', async (req, res) => {
       created_at: r.created_at,
       creator_name: r.creator_name,
       lesson_title: r.lesson_title,
-      assessment_type: r.assessment_type || 'quiz'
+      assessment_type: r.assessment_type || 'quiz',
+      question_count: Number(r.question_count) || 0
     }));
     res.json({ success: true, data });
   } catch (e) {

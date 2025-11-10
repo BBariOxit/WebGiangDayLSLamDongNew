@@ -12,10 +12,16 @@ function buildListQuery({ createdBy, lessonId, standalone }, includeAssessmentCo
   let sql = `
     SELECT q.quiz_id, q.title, q.description, q.lesson_id, q.created_by, q.created_at, q.difficulty, q.time_limit,
            ${includeAssessmentColumn ? 'q.assessment_type' : `'quiz'::varchar AS assessment_type`},
-           u.full_name as creator_name, l.title as lesson_title
+           u.full_name as creator_name, l.title as lesson_title,
+           COALESCE(qcounts.question_count, 0) AS question_count
     FROM quizzes q
     LEFT JOIN users u ON u.user_id = q.created_by
     LEFT JOIN lessons l ON l.lesson_id = q.lesson_id
+    LEFT JOIN (
+      SELECT quiz_id, COUNT(*) AS question_count
+      FROM quiz_questions
+      GROUP BY quiz_id
+    ) qcounts ON qcounts.quiz_id = q.quiz_id
     WHERE 1=1
   `;
 

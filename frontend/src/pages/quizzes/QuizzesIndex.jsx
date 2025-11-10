@@ -171,7 +171,15 @@ const QuizzesIndex = () => {
         </CardHeader>
         <CardContent className="flex flex-1 flex-col gap-4">
           {quiz.description && (
-            <CardDescription className="line-clamp-2 text-base leading-relaxed text-slate-600">
+            <CardDescription
+              className="text-base leading-relaxed text-slate-600"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
               {quiz.description}
             </CardDescription>
           )}
@@ -205,8 +213,10 @@ const QuizzesIndex = () => {
               Sẵn sàng
             </div>
             <Button
+              type="button"
               className="rounded-2xl font-semibold"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 handleOpenQuiz(quiz);
               }}
@@ -222,7 +232,7 @@ const QuizzesIndex = () => {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 p-6 text-white shadow-smooth">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_45%)] opacity-70" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_45%)] opacity-70" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
           <div className="space-y-4 md:flex-1">
             <p className="text-sm uppercase tracking-[0.3em] text-white/60">Trung tâm bài kiểm tra</p>
@@ -234,7 +244,7 @@ const QuizzesIndex = () => {
               giúp trải nghiệm thống nhất với hệ thống.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleRandomQuiz} className="rounded-2xl bg-white text-slate-900 hover:bg-white/90">
+              <Button type="button" onClick={handleRandomQuiz} className="rounded-2xl bg-white text-slate-900 hover:bg-white/90">
                 <Shuffle className="mr-2 h-4 w-4" />
                 Quiz ngẫu nhiên
               </Button>
@@ -258,15 +268,30 @@ const QuizzesIndex = () => {
             {featured.map((quiz, idx) => (
               <div
                 key={`featured-${idx}`}
-                className="rounded-2xl bg-white/80 p-4 text-slate-900 shadow-lg transition hover:shadow-xl"
+                className="flex h-full flex-col rounded-2xl bg-white/80 p-4 text-slate-900 shadow-lg transition hover:shadow-xl"
               >
                 <p className="text-xs uppercase tracking-wide text-slate-500">Nổi bật</p>
-                <p className="mt-1 font-heading text-lg font-semibold">{quiz.title}</p>
-                <p className="line-clamp-2 text-sm text-slate-600">{quiz.description || 'Khám phá ngay.'}</p>
+                <p className="mt-1 font-heading text-lg font-semibold line-clamp-2">{quiz.title}</p>
+                <p
+                  className="text-sm text-slate-600"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    marginBottom: '3px'
+                  }}
+                >
+                  {quiz.description || 'Khám phá ngay.'}
+                </p>
                 <Button
+                  type="button"
                   size="sm"
-                  className="mt-3 rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
-                  onClick={() => handleOpenQuiz(quiz)}
+                  className="mt-auto w-fit rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleOpenQuiz(quiz);
+                  }}
                 >
                   Vào thi
                 </Button>

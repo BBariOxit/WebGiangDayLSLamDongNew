@@ -14,3 +14,8 @@ export async function markAllNotificationsRead() {
   const res = await apiClient.post(`/notifications/read-all`);
   return res.data?.data || { success: true };
 }
+
+export async function deleteNotification(id) {
+  const res = await apiClient.delete(`/notifications/${id}`);
+  return res.data?.data || { success: true };
+}

@@ -23,10 +23,7 @@ import {
   Chip,
   alpha,
   Fade,
-  MenuList,
-  Button,
-  Tooltip,
-  ListItemAvatar
+  Tooltip
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -45,7 +42,8 @@ import {
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
-import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notificationsApi';
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from '../../api/notificationsApi';
+import { BellRing, GraduationCap, NotebookPen, Trash2 } from 'lucide-react';
 
 const expandedDrawerWidth = 280;
 const collapsedDrawerWidth = 72;
@@ -132,12 +130,27 @@ const AppLayout = () => {
     setNotifAnchor(e.currentTarget);
   };
   const closeNotifMenu = () => setNotifAnchor(null);
-  const handleOpenNotifications = async (e) => {
+  const handleOpenNotifications = (e) => {
     openNotifMenu(e);
+  };
+  const handleMarkAllRead = async () => {
     try {
       if (user) {
         const r = await markAllNotificationsRead();
         setUnread(r.unreadCount || 0);
+        setNotifs((prev) => prev.map((n) => ({ ...n, read_at: new Date().toISOString() })));
+      }
+    } catch {}
+  };
+
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      if (user) {
+        const r = await deleteNotification(notificationId);
+        setUnread(r.unreadCount || 0);
+        setNotifs((prev) => prev.filter((n) => n.notification_id !== notificationId));
       }
     } catch {}
   };
@@ -153,11 +166,63 @@ const AppLayout = () => {
     } catch { return ''; }
   };
 
+  const normalizeNotificationData = (payload) => {
+    if (!payload) return {};
+    if (typeof payload === 'string') {
+      try { return JSON.parse(payload); } catch { return {}; }
+    }
+    return payload;
+  };
+
   const notifUrl = (n) => {
-    if (n?.data?.url) return n.data.url;
-    if (n?.type === 'new_lesson' && n?.data?.slug) return `/lesson/${n.data.slug}`;
-    if (n?.type === 'new_quiz' && n?.data?.quizId) return `/quizzes/take/${n.data.quizId}`;
+    const data = normalizeNotificationData(n?.data);
+    if (data?.url) return data.url;
+    if (n?.type === 'new_lesson' && data?.slug) return `/lesson/${data.slug}`;
+    if (n?.type === 'new_quiz' && data?.quizId) return `/quizzes/take/${data.quizId}`;
     return '/';
+  };
+
+  const notificationMeta = (notif) => {
+    const type = notif?.type;
+    const data = normalizeNotificationData(notif?.data);
+    const assessmentType = (data?.assessmentType || '').toLowerCase();
+    const assessmentColors = {
+      quiz: 'bg-indigo-100 text-indigo-700',
+      'trắc nghiệm 1 đáp án': 'bg-indigo-100 text-indigo-700',
+      multi_choice: 'bg-pink-100 text-pink-700',
+      'trắc nghiệm nhiều đáp án': 'bg-pink-100 text-pink-700',
+      fill_blank: 'bg-emerald-100 text-emerald-700',
+      'điền đáp án': 'bg-emerald-100 text-emerald-700'
+    };
+    switch (type) {
+      case 'new_quiz':
+        return {
+          label: 'Quiz mới',
+          secondary: data?.assessmentLabel || null,
+          secondaryColor: assessmentColors[assessmentType] || 'bg-slate-100 text-slate-600',
+          icon: <NotebookPen className="h-5 w-5" />,
+          gradient: 'from-fuchsia-500 to-purple-500',
+          pill: 'bg-purple-100 text-purple-700'
+        };
+      case 'new_lesson':
+        return {
+          label: 'Bài học mới',
+          icon: <GraduationCap className="h-5 w-5" />,
+          gradient: 'from-sky-500 to-cyan-500',
+          pill: 'bg-cyan-100 text-cyan-700',
+          secondary: null,
+          secondaryColor: null
+        };
+      default:
+        return {
+          label: 'Thông báo',
+          icon: <BellRing className="h-5 w-5" />,
+          gradient: 'from-slate-500 to-slate-600',
+          pill: 'bg-slate-100 text-slate-600',
+          secondary: null,
+          secondaryColor: null
+        };
+    }
   };
 
   const onClickNotif = async (n) => {
@@ -436,59 +501,106 @@ const AppLayout = () => {
         onClose={closeNotifMenu}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{
+          sx: { backgroundColor: 'transparent', boxShadow: 'none' }
+        }}
       >
-        <Box sx={{ minWidth: 360, p: 1 }}>
-          <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', px:1, pb:1 }}>
-            <Typography variant="subtitle1" fontWeight="bold">Thông báo</Typography>
-            {!!unread && <Chip size="small" color="error" label={`${unread} mới`} />}
-          </Box>
-          <Divider />
-          <MenuList dense>
+        <div className="w-[360px] max-h-[520px] rounded-[24px] border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5">
+          <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <p className="text-base font-semibold text-slate-900">Thông báo</p>
+              <p className="text-xs text-slate-500">
+                {unread ? `${unread} thông báo chưa đọc` : 'Bạn đã đọc hết thông báo'}
+              </p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {notifs.length} mục
+            </span>
+          </div>
+
+          <div className="max-h-[360px] divide-y divide-slate-100 overflow-y-auto">
             {notifs.length === 0 ? (
-              <ListItem><ListItemText primary="Không có thông báo" /></ListItem>
-            ) : notifs.map(n => (
-              <ListItem 
-                key={n.notification_id} 
-                alignItems="flex-start" 
-                onClick={() => onClickNotif(n)} 
-                sx={{ 
-                  cursor:'pointer', 
-                  p:1.5, 
-                  mb:0.5,
-                  border:'1px solid',
-                  borderColor:'divider',
-                  borderRadius:1,
-                  '&:hover':{ bgcolor:'action.hover' } 
-                }}
-              >
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: n.type === 'new_quiz' ? 'secondary.main' : 'primary.main' }}>
-                    {n.type === 'new_quiz' ? <QuizIcon /> : <SchoolIcon />}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText 
-                  primary={
-                    <Box>
-                      <Box sx={{ display:'flex', alignItems:'center', gap:1, mb:0.5 }}>
-                        <Chip size="small" label={n.type === 'new_quiz' ? 'Quiz mới' : 'Bài học mới'} color={n.type === 'new_quiz' ? 'secondary' : 'primary'} />
-                      </Box>
-                      <Typography variant="subtitle2" fontWeight={600}>{n.title}</Typography>
-                    </Box>
-                  } 
-                  secondary={
-                    <>
-                      <Typography variant="body2" color="text.secondary" sx={{ display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{n.body}</Typography>
-                      <Typography variant="caption" color="text.disabled">{toRelative(n.created_at)}</Typography>
-                    </>
-                  }
-                />
-              </ListItem>
-            ))}
-          </MenuList>
-          <Box sx={{ px:1, pt:0.5, pb:1, display:'flex', justifyContent:'flex-end' }}>
-            <Button size="small" onClick={async ()=>{ try{ const r=await markAllNotificationsRead(); setUnread(r.unreadCount||0);}catch{} }}>Đánh dấu đã đọc hết</Button>
-          </Box>
-        </Box>
+              <div className="flex flex-col items-center justify-center px-6 py-10 text-center text-slate-500">
+                <BellRing className="mb-3 h-8 w-8 text-slate-400" />
+                <p className="text-sm font-medium">Không có thông báo mới</p>
+                <p className="text-xs">Bạn sẽ thấy thông báo mới ở đây khi có cập nhật.</p>
+              </div>
+            ) : (
+              notifs.map((n) => {
+                const data = normalizeNotificationData(n.data);
+                const meta = notificationMeta({ ...n, data });
+                return (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    key={n.notification_id}
+                    onClick={() => onClickNotif(n)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClickNotif(n); }}
+                    className="flex w-full items-start gap-3 px-5 py-4 text-left transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                  >
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${meta.gradient} text-white`}>
+                      {meta.icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.pill}`}>
+                          {meta.label}
+                        </span>
+                        {meta.secondary && (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${meta.secondaryColor || 'bg-slate-100 text-slate-600'}`}>
+                            {meta.secondary}
+                          </span>
+                        )}
+                        {!n.read_at && <span className="h-2 w-2 rounded-full bg-emerald-500" />}
+                      </div>
+                      <p
+                        className="mt-1 text-sm font-semibold text-slate-900"
+                        style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      >
+                        {n.title || 'Thông báo mới'}
+                      </p>
+                      {n.type === 'new_lesson' && data?.lessonTitle && (
+                        <p className="text-xs text-slate-500 line-clamp-1">
+                          Thuộc bài học: {data.lessonTitle}
+                        </p>
+                      )}
+                      {n.type === 'new_quiz' && data?.lessonId && (
+                        <p className="text-xs text-slate-500 line-clamp-1">
+                          Thuộc bài học #{data.lessonId}
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-slate-400">{toRelative(n.created_at)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteNotification(e, n.notification_id)}
+                      className="ml-3 rounded-full border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex items-center justify-between px-5 py-3">
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              className="text-sm font-semibold text-slate-600 transition hover:text-slate-900"
+            >
+              Đánh dấu đã đọc hết
+            </button>
+            <button
+              type="button"
+              onClick={closeNotifMenu}
+              className="text-sm text-slate-400 transition hover:text-slate-600"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
       </Menu>
 
       <Menu

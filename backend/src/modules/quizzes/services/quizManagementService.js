@@ -152,7 +152,17 @@ export async function createQuizSvc({ title, description, lessonId, questions, t
     }
     throw error;
   }
-  try { await publishNewQuizNotification({ ...result, quiz_id: result.quiz_id, lesson_id: result.lesson_id }); } catch {}
+  try {
+    await publishNewQuizNotification({
+      quiz_id: result.quizId,
+      lesson_id: lessonId || null,
+      title,
+      description,
+      assessment_type: safeAssessment,
+      difficulty,
+      time_limit: timeLimit
+    });
+  } catch {}
   return result;
 }
 
