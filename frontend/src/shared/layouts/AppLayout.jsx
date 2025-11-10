@@ -25,7 +25,7 @@ import {
   Fade,
   MenuList,
   Button,
-  
+  Tooltip,
   ListItemAvatar
 } from '@mui/material';
 import {
@@ -40,13 +40,15 @@ import {
   Notifications as NotificationsIcon,
   Dashboard as DashboardIcon,
   ChevronRight as ChevronRightIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  ChevronLeft as ChevronLeftIcon
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../api/notificationsApi';
 
-const drawerWidth = 280;
+const expandedDrawerWidth = 280;
+const collapsedDrawerWidth = 72;
 
 
 
@@ -56,11 +58,14 @@ const AppLayout = () => {
   const [notifAnchor, setNotifAnchor] = useState(null);
   const [unread, setUnread] = useState(0);
   const [notifs, setNotifs] = useState([]);
+  const [collapsed, setCollapsed] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  const drawerWidth = collapsed ? collapsedDrawerWidth : expandedDrawerWidth;
 
   const menuItems = [
     { text: 'Trang chủ', icon: HomeIcon, path: '/', color: '#2196f3' },
@@ -80,6 +85,14 @@ const AppLayout = () => {
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  const handleCollapseToggle = () => {
+    if (isMobile) {
+      setMobileOpen((prev) => !prev);
+      return;
+    }
+    setCollapsed((prev) => !prev);
   };
 
   const handleProfileMenuOpen = (event) => {
@@ -208,7 +221,7 @@ const AppLayout = () => {
   };
 
   const drawer = (
-    <Box>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Logo */}
       <Box sx={{ 
         p: 3, 
@@ -217,16 +230,24 @@ const AppLayout = () => {
         background: 'linear-gradient(135deg, #1976d2, #2196f3)',
         color: 'white'
       }}>
-        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
-          🏛️ Lâm Đồng
-        </Typography>
-        <Typography variant="caption" sx={{ opacity: 0.9 }}>
-          Hệ thống giảng dạy lịch sử
-        </Typography>
+        {collapsed ? (
+          <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', textAlign: 'center' }}>
+            🏛️
+          </Typography>
+        ) : (
+          <>
+            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+              🏛️ Lâm Đồng
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9 }}>
+              Hệ thống giảng dạy lịch sử
+            </Typography>
+          </>
+        )}
       </Box>
 
       {/* User Info */}
-      {user && (
+      {user && !collapsed && (
         <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar 
@@ -254,46 +275,83 @@ const AppLayout = () => {
       )}
 
       {/* Navigation */}
-      <List sx={{ px: 2, py: 1 }}>
+      <List sx={{ px: collapsed ? 1 : 2, py: 1, flexGrow: 1, overflowY: 'auto' }}>
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path || 
                           (item.path !== '/' && location.pathname.startsWith(item.path));
-          
-          return (
-            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-              <ListItemButton
-                onClick={() => handleNavigation(item.path)}
-                sx={{
-                  borderRadius: 0,
+          const button = (
+            <ListItemButton
+              onClick={() => handleNavigation(item.path)}
+              sx={{
+                borderRadius: 0,
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                px: collapsed ? 1.5 : 2,
+                '&:hover': {
+                  bgcolor: alpha(item.color, 0.1),
+                },
+                ...(isActive && {
+                  bgcolor: alpha(item.color, 0.15),
+                  color: item.color,
                   '&:hover': {
-                    bgcolor: alpha(item.color, 0.1),
-                  },
-                  ...(isActive && {
-                    bgcolor: alpha(item.color, 0.15),
-                    color: item.color,
-                    '&:hover': {
-                      bgcolor: alpha(item.color, 0.2),
-                    }
-                  })
-                }}
-              >
-                <ListItemIcon sx={{ 
-                  color: isActive ? item.color : 'text.secondary',
-                  minWidth: 40 
-                }}>
-                  <item.icon />
-                </ListItemIcon>
+                    bgcolor: alpha(item.color, 0.2),
+                  }
+                })
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: isActive ? item.color : 'text.secondary',
+                minWidth: collapsed ? 0 : 40,
+                mr: collapsed ? 0 : 1.5,
+                display: 'flex',
+                justifyContent: 'center'
+              }}>
+                <item.icon />
+              </ListItemIcon>
+              {!collapsed && (
                 <ListItemText 
                   primary={item.text}
                   primaryTypographyProps={{
                     fontWeight: isActive ? 'bold' : 'medium'
                   }}
                 />
-              </ListItemButton>
+              )}
+            </ListItemButton>
+          );
+          
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+              {collapsed ? (
+                <Tooltip title={item.text} placement="right">
+                  {button}
+                </Tooltip>
+              ) : (
+                button
+              )}
             </ListItem>
           );
         })}
       </List>
+
+      <Divider sx={{ mt: 'auto' }} />
+      <Box
+        sx={{
+          p: collapsed ? 1 : 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'space-between'
+        }}
+      >
+        {!collapsed && (
+          <Typography variant="body2" color="text.secondary">
+            Thu gọn menu
+          </Typography>
+        )}
+        <Tooltip title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} placement="right">
+          <IconButton size="small" onClick={handleCollapseToggle}>
+            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Tooltip>
+      </Box>
     </Box>
   );
 
@@ -308,18 +366,21 @@ const AppLayout = () => {
           color: 'text.primary',
           boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
           borderBottom: '1px solid',
-          borderColor: 'divider'
+          borderColor: 'divider',
+          transition: theme.transitions.create(['width', 'margin'], {
+            duration: theme.transitions.duration.shortest
+          })
         }}
       >
         <Toolbar>
           <IconButton
             color="inherit"
-            aria-label="open drawer"
+            aria-label="toggle drawer"
             edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
+            onClick={handleCollapseToggle}
+            sx={{ mr: 2 }}
           >
-            <MenuIcon />
+            {isMobile ? <MenuIcon /> : (collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />)}
           </IconButton>
 
           {/* Breadcrumbs */}
@@ -467,7 +528,7 @@ const AppLayout = () => {
 
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 }, transition: theme.transitions.create('width', { duration: theme.transitions.duration.shortest }) }}
       >
         <Drawer
           variant="temporary"
@@ -478,7 +539,7 @@ const AppLayout = () => {
           }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: expandedDrawerWidth },
           }}
         >
           {drawer}
@@ -487,12 +548,14 @@ const AppLayout = () => {
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { 
+            '& .MuiDrawer-paper': (theme) => ({ 
               boxSizing: 'border-box', 
               width: drawerWidth,
               borderRight: '1px solid #e0e0e0',
-              borderRadius: 0
-            },
+              borderRadius: 0,
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', { duration: theme.transitions.duration.shortest })
+            }),
           }}
           open
         >
@@ -506,7 +569,8 @@ const AppLayout = () => {
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
-          bgcolor: 'background.default'
+          bgcolor: 'background.default',
+          transition: theme.transitions.create(['margin', 'width'], { duration: theme.transitions.duration.shortest })
         }}
       >
         <Toolbar /> {/* Spacer for fixed AppBar */}
