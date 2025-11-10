@@ -19,10 +19,12 @@ frontend/
     layouts/              # Legacy AppLayout (đang được sử dụng runtime)
     routes/               # Legacy router (đang được sử dụng runtime)
     contexts/             # Legacy AuthContext (AuthProvider + useAuth)
-    features/             # Kiến trúc theo feature (mới) – đã có admin
+    features/             # Kiến trúc theo feature (mới) – đang dùng cho admin/teacher
       admin/
-        pages/AdminDashboard.jsx
-        components/AdminLessons.jsx
+        pages/LessonsManagement.jsx
+        pages/QuizzesManagement.jsx
+      teacher/
+        pages/MyQuizzes.jsx
     shared/
       api/
         quizService.js    # LocalStorage + seed
@@ -41,7 +43,7 @@ Lưu ý: hiện tồn tại song song 2 “phong cách” (legacy vs feature-bas
 2. `src/App.jsx` bọc `AuthProvider` (legacy) và `ErrorBoundary`, render `AppRoutes`.
 3. `src/routes/index.jsx` khai báo routes (public + protected) và dùng `AppLayout` làm layout.
 4. `AppLayout` render Drawer/Menu theo role từ `useAuth()`.
-5. Admin → truy cập `/admin` sẽ render `features/admin/pages/AdminDashboard.jsx` (đã tích hợp `AdminLessons`).
+5. Các route quản trị (`/admin/lessons`, `/admin/quizzes`, `/admin/create-quiz`) chạy qua `ProtectedRoute` (role admin) và render `features/admin/pages/LessonsManagement.jsx`, `features/admin/pages/QuizzesManagement.jsx`, hoặc trang `pages/admin/AdminCreateQuiz.jsx`.
 
 Auth mock (legacy): `src/contexts/AuthContext.jsx` lưu user + authToken vào localStorage. Có Redux slice cho auth, nhưng hiện entry đang dùng context.
 
@@ -68,7 +70,7 @@ Auth mock (legacy): `src/contexts/AuthContext.jsx` lưu user + authToken vào lo
 - Public: `/`, `/lesson/:slug`, `/login`, `/register`, `/lessons` (với layout).
 - Protected chung: `/dashboard`, `/quizzes`, `/quizzes/take/:id`, `/quizzes/results/:attemptId`.
 - Teacher: `/teacher/quizzes`.
-- Admin: `/admin`, `/admin/create-quiz`, `/admin/quizzes`.
+- Admin: `/admin/lessons`, `/admin/quizzes`, `/admin/create-quiz`.
 - Component bảo vệ: `src/components/ProtectedRoute.jsx` – đọc `useAuth()`; Admin có quyền truy cập tất cả.
 
 ---
@@ -147,7 +149,7 @@ npm run dev
 - Nguyên nhân: file service import `./client.js` không tồn tại.
 - Cách xử lý: đảm bảo `src/shared/api/quizService.js` và `lessonService.js` KHÔNG import `./client.js`. Phiên bản hiện tại sử dụng LocalStorage-only.
 
-2) Màn hình trắng (white screen) khi vào /admin hoặc trang khác
+2) Màn hình trắng (white screen) khi vào trang quản trị (ví dụ `/admin/lessons`) hoặc trang khác
 - Mở DevTools → Console, xem lỗi đỏ đầu tiên.
 - Lỗi thường gặp:
   - Import icon sai (ví dụ `Draft` không tồn tại) → sửa sang `Archive` hoặc icon hợp lệ.
@@ -175,7 +177,7 @@ npm run dev
 ## 10. Kiểm thử nhanh (Smoke test)
 
 - Chạy `npm run dev` trong `frontend/` → mở app trên trình duyệt.
-- Đăng nhập Admin (demo) → mở `/admin`.
+- Đăng nhập Admin (demo) → mở `/admin/lessons`.
 - Tab "Quản lý Bài học" hiển thị danh sách seed → thử tạo/sửa/xóa → kiểm tra LocalStorage cập nhật.
 - Mở Quizzes → làm thử 1 bài → xem kết quả và thống kê.
 

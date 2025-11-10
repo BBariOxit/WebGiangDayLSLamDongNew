@@ -24,6 +24,6 @@ npm run preview
 
 - `src/styles/theme.js`: chủ đề MUI (màu sắc, typography)
 - `src/layouts/MainLayout.jsx`: Navbar + Sidebar + vùng nội dung
-- `src/features/auth/pages/*`: Trang Home, Login, Register mẫu
+- `src/pages/{Home,Login,Register}.jsx`: Trang Home, Login, Register đang dùng
 
 Bạn có thể bắt đầu phát triển các module Student/Teacher/Admin trong `src/features`.

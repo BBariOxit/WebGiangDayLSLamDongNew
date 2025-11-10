@@ -1,6 +1,6 @@
 import React from 'react';
 import { quizService } from '../../shared/services/quizService';
-import { lessonsData } from '../../data/lessonsData';
+import { lessonsData } from '../../shared/constants/lessonsData';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { 

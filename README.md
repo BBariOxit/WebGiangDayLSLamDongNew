@@ -31,9 +31,11 @@ webGDLSLD/
 │  │  ├─ routes/              # Legacy router used at runtime
 │  │  ├─ contexts/            # Legacy AuthContext (AuthProvider + useAuth)
 │  │  ├─ features/            # New feature-based modules
-│  │  │  └─ admin/
-│  │  │     ├─ pages/AdminDashboard.jsx
-│  │  │     └─ components/AdminLessons.jsx
+│  │  │  ├─ admin/
+│  │  │  │  ├─ pages/LessonsManagement.jsx   # Active admin lessons view
+│  │  │  │  └─ pages/QuizzesManagement.jsx   # Active admin quizzes view
+│  │  │  └─ teacher/
+│  │  │     └─ pages/MyQuizzes.jsx           # Reuses admin quizzes UI for teachers
 │  │  └─ shared/
 │  │     ├─ api/              # LocalStorage-first services
 │  │     │  ├─ quizService.js
@@ -105,7 +107,7 @@ The app uses the legacy router at `src/routes/index.jsx` and layout at `src/layo
 - `/dashboard` (protected)
 - `/quizzes`, `/quizzes/take/:id`, `/quizzes/results/:attemptId` (protected)
 - `/teacher/quizzes` (protected; teacher)
-- `/admin` (protected; admin → AdminDashboard)
+- `/admin/lessons`, `/admin/quizzes`, `/admin/create-quiz` (protected; admin management views)
 - `/admin/create-quiz`, `/admin/quizzes` (protected; legacy admin pages)
 
 ## Data & Storage
