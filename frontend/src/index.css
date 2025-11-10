@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #0f172a;
+    background-color: #f4f6fb;
+  }
+
+  body {
+    @apply bg-[#f4f6fb] text-slate-900;
+  }
+
+  ::selection {
+    @apply bg-brand text-white;
+  }
+}

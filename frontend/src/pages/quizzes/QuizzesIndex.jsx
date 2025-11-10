@@ -1,56 +1,44 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { quizApi } from '../../api/quizApi';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { cn } from '../../lib/utils';
 import {
-  Box, Grid, Card, CardContent, Typography, Button, Chip, Paper, InputAdornment, TextField, Select, MenuItem, FormControl, InputLabel, Avatar, Skeleton
-} from '@mui/material';
-import { Quiz as QuizIcon, Search as SearchIcon, Timer as TimerIcon, Help as HelpIcon, School as SchoolIcon, EmojiEvents as EmojiEventsIcon, ErrorOutline as ErrorOutlineIcon, NavigateNext } from '@mui/icons-material';
+  AlarmClock,
+  BarChart3,
+  BookOpenCheck,
+  Filter,
+  Layers3,
+  Search,
+  Shuffle,
+  Sparkles,
+  Timer,
+} from 'lucide-react';
+
+const difficultyPalette = {
+  'Cơ bản': 'from-emerald-500 to-emerald-600',
+  'Trung bình': 'from-amber-500 to-amber-600',
+  'Nâng cao': 'from-rose-500 to-rose-600',
+};
+
+const difficultyFilters = ['Cơ bản', 'Trung bình', 'Nâng cao'];
+const sortOptions = [
+  { value: 'fresh', label: 'Mới nhất' },
+  { value: 'duration', label: 'Thời lượng tăng dần' },
+  { value: 'difficulty', label: 'Độ khó' },
+];
 
 const QuizzesIndex = () => {
   const navigate = useNavigate();
   const [search, setSearch] = React.useState('');
   const [difficulty, setDifficulty] = React.useState('');
+  const [sort, setSort] = React.useState('fresh');
   const [quizzes, setQuizzes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
-
-  const getDifficultyTheme = (level) => {
-    // Modern color palette with vibrant gradients
-    switch (level) {
-      case 'Cơ bản':
-        return { 
-          primary: '#10b981', 
-          secondary: '#059669',
-          light: '#d1fae5',
-          border: '#6ee7b7',
-          shadow: 'rgba(16, 185, 129, 0.2)'
-        };
-      case 'Trung bình':
-        return { 
-          primary: '#f59e0b', 
-          secondary: '#d97706',
-          light: '#fef3c7',
-          border: '#fbbf24',
-          shadow: 'rgba(245, 158, 11, 0.2)'
-        };
-      case 'Nâng cao':
-        return { 
-          primary: '#ef4444', 
-          secondary: '#dc2626',
-          light: '#fee2e2',
-          border: '#fca5a5',
-          shadow: 'rgba(239, 68, 68, 0.2)'
-        };
-      default:
-        return { 
-          primary: '#3b82f6', 
-          secondary: '#2563eb',
-          light: '#dbeafe',
-          border: '#93c5fd',
-          shadow: 'rgba(59, 130, 246, 0.2)'
-        };
-    }
-  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -58,374 +46,370 @@ const QuizzesIndex = () => {
       try {
         setLoading(true);
         const data = await quizApi.listPublicQuizzes();
-        if (mounted) setQuizzes(data);
+        if (mounted) setQuizzes(Array.isArray(data) ? data : []);
       } catch (e) {
         if (mounted) setError(e.message || 'Không tải được danh sách quiz');
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
+
   const filtered = useMemo(() => {
-    return (quizzes || []).filter(q => {
-      const title = (q.title || '').toLowerCase();
-      const desc = (q.description || '').toLowerCase();
-      const matchesSearch = title.includes(search.toLowerCase()) || desc.includes(search.toLowerCase());
-      const matchesDiff = !difficulty || q.difficulty === difficulty;
-      return matchesSearch && matchesDiff;
+    const keyword = search.trim().toLowerCase();
+    return (quizzes || []).filter((quiz) => {
+      const title = (quiz.title || '').toLowerCase();
+      const desc = (quiz.description || '').toLowerCase();
+      const matchesKeyword = !keyword || title.includes(keyword) || desc.includes(keyword);
+      const matchesDifficulty = !difficulty || quiz.difficulty === difficulty;
+      return matchesKeyword && matchesDifficulty;
     });
   }, [quizzes, search, difficulty]);
 
-  // Optional: could fetch stats from backend later
+  const sorted = useMemo(() => {
+    const byDifficulty = {
+      'Cơ bản': 0,
+      'Trung bình': 1,
+      'Nâng cao': 2,
+    };
+    const copy = [...filtered];
+    switch (sort) {
+      case 'duration':
+        return copy.sort(
+          (a, b) => Number(a.time_limit || a.duration || 0) - Number(b.time_limit || b.duration || 0)
+        );
+      case 'difficulty':
+        return copy.sort(
+          (a, b) => (byDifficulty[a.difficulty] ?? 99) - (byDifficulty[b.difficulty] ?? 99)
+        );
+      default:
+        return copy.sort(
+          (a, b) =>
+            new Date(b.updated_at || b.created_at || b.updatedAt || b.createdAt || 0) -
+            new Date(a.updated_at || a.created_at || a.updatedAt || a.createdAt || 0)
+        );
+    }
+  }, [filtered, sort]);
+
+  const stats = useMemo(() => {
+    const shown = sorted.length;
+    const totalMinutes = sorted.reduce(
+      (sum, quiz) => sum + Number(quiz.time_limit || quiz.duration || 0),
+      0
+    );
+    const totalQuestions = sorted.reduce((sum, quiz) => {
+      if (Array.isArray(quiz.questions)) return sum + quiz.questions.length;
+      return sum + Number(quiz.question_count || quiz.question_total || 0);
+    }, 0);
+    const topicMap = sorted.reduce((acc, quiz) => {
+      const category = quiz.category || 'Chưa phân loại';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+    const topCategory = Object.entries(topicMap).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+    return {
+      shown,
+      totalMinutes,
+      avgDuration: shown ? Math.round(totalMinutes / shown) : 0,
+      totalQuestions,
+      topCategory,
+    };
+  }, [sorted]);
+
+  const featured = sorted.slice(0, 3);
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setDifficulty('');
+    setSort('fresh');
+  };
+
+  const handleRandomQuiz = () => {
+    if (!sorted.length) return;
+    const randomQuiz = sorted[Math.floor(Math.random() * sorted.length)];
+    if (randomQuiz?.quiz_id || randomQuiz?.id) {
+      navigate(`/quizzes/take/${randomQuiz.quiz_id ?? randomQuiz.id}`);
+    }
+  };
+
+  const handleOpenQuiz = (quiz) => {
+    if (!quiz.quiz_id && !quiz.id) return;
+    navigate(`/quizzes/take/${quiz.quiz_id ?? quiz.id}`);
+  };
+
+  const renderQuizCard = (quiz, idx) => {
+    const gradient = difficultyPalette[quiz.difficulty] || 'from-blue-500 to-blue-600';
+    const questions = Array.isArray(quiz.questions)
+      ? quiz.questions.length
+      : quiz.question_count || quiz.question_total || 0;
+
+    return (
+      <Card
+        key={quiz.quiz_id ?? quiz.id ?? idx}
+        className="group flex h-full flex-col border-0 bg-white/90 shadow-smooth transition hover:-translate-y-1 hover:shadow-xl"
+        onClick={() => handleOpenQuiz(quiz)}
+      >
+        <CardHeader className="flex flex-row items-start gap-4">
+          <div className={cn('rounded-2xl bg-gradient-to-br p-3 text-white shadow-lg', gradient)}>
+            <Sparkles className="h-6 w-6" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="font-heading text-xl text-slate-900">
+              {quiz.title || 'Quiz không tên'}
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              {quiz.category && <Badge variant="secondary">{quiz.category}</Badge>}
+              <Badge variant="outline" className="border-dashed">
+                {quiz.difficulty || 'Chưa rõ'}
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col gap-4">
+          {quiz.description && (
+            <CardDescription className="line-clamp-2 text-base leading-relaxed text-slate-600">
+              {quiz.description}
+            </CardDescription>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
+            <MiniStat icon={<Timer className="h-4 w-4" />} label="Thời lượng" value={`${quiz.time_limit || 0} phút`} />
+            <MiniStat
+              icon={<BookOpenCheck className="h-4 w-4" />}
+              label="Câu hỏi"
+              value={`${questions || 0} câu`}
+            />
+            <MiniStat icon={<Layers3 className="h-4 w-4" />} label="Chủ đề" value={quiz.category || 'Đang cập nhật'} />
+          </div>
+
+          {(quiz.lesson_title || quiz.creator_name) && (
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
+              {quiz.lesson_title && (
+                <span className="font-medium text-slate-600">Bài học: {quiz.lesson_title}</span>
+              )}
+              {quiz.creator_name && (
+                <span className="rounded-full bg-white/70 px-3 py-1 font-medium text-slate-600">
+                  {quiz.creator_name}
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="mt-auto flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Sẵn sàng
+            </div>
+            <Button
+              className="rounded-2xl font-semibold"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenQuiz(quiz);
+              }}
+            >
+              Bắt đầu
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
-    <Box>
-      {/* Hero header */}
-      <Paper elevation={0} sx={{
-        mb: 3,
-        p: 3,
-        borderRadius: 3,
-        background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)',
-        border: '1px solid #e3f2fd'
-      }}>
-        <Box sx={{ display:'flex', alignItems:'center', gap:2, flexWrap:'wrap' }}>
-          <Box sx={{ width: 48, height: 48, borderRadius: 2, bgcolor: 'white', border: '1px solid #e0e0e0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <QuizIcon color="primary" />
-          </Box>
-          <Box sx={{ flex:1, minWidth: 220 }}>
-            <Typography variant="h4" fontWeight="bold">Quiz & Bài tập</Typography>
-            <Typography variant="body2" color="text.secondary">Chọn một bài quiz để bắt đầu luyện tập và kiểm tra kiến thức của bạn.</Typography>
-          </Box>
-          <Box sx={{ display:'flex', gap:1, alignItems:'center', flexWrap:'wrap' }}>
-            <Chip icon={<EmojiEventsIcon/>} label={`${filtered.length} bài phù hợp`} sx={{ bgcolor:'#fff', border:'1px solid #e0e0e0' }} />
-            <Chip icon={<SchoolIcon/>} label={`${quizzes.length} bài tổng`} sx={{ bgcolor:'#fff', border:'1px solid #e0e0e0' }} />
-          </Box>
-        </Box>
-      </Paper>
-
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <TextField fullWidth placeholder="Tìm kiếm quiz" value={search} onChange={(e)=>setSearch(e.target.value)}
-            InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon/></InputAdornment>) }} />
-        </Grid>
-        <Grid item xs={12} md={3}>
-          <FormControl fullWidth>
-            <InputLabel>Độ khó</InputLabel>
-            <Select value={difficulty} label="Độ khó" onChange={(e)=>setDifficulty(e.target.value)}>
-              <MenuItem value="">Tất cả</MenuItem>
-              <MenuItem value="Cơ bản">Cơ bản</MenuItem>
-              <MenuItem value="Trung bình">Trung bình</MenuItem>
-              <MenuItem value="Nâng cao">Nâng cao</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12} md={3} sx={{ display:'flex', alignItems:'stretch' }}>
-          {Boolean(search || difficulty) && (
-            <Button fullWidth variant="outlined" color="inherit" onClick={()=>{ setSearch(''); setDifficulty(''); }}>
-              Xóa bộ lọc
-            </Button>
-          )}
-        </Grid>
-      </Grid>
-
-      {loading && (
-        <Grid container spacing={3} sx={{ mb:4 }}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Grid key={i} item xs={12} sm={6} lg={4}>
-              <Card sx={{ borderRadius:3, p:0 }}>
-                <Box sx={{ p:3, borderBottom:'1px solid #eee', display:'flex', alignItems:'center', gap:1 }}>
-                  <Skeleton variant="circular" width={32} height={32} />
-                  <Skeleton variant="text" width="60%" height={28} />
-                </Box>
-                <CardContent>
-                  <Skeleton variant="text" width="90%" />
-                  <Skeleton variant="text" width="80%" />
-                  <Box sx={{ display:'flex', gap:1, mt:2 }}>
-                    <Skeleton variant="rounded" width={80} height={28} />
-                    <Skeleton variant="rounded" width={80} height={28} />
-                    <Skeleton variant="rounded" width={80} height={28} />
-                  </Box>
-                </CardContent>
-                <Box sx={{ p:2, display:'flex', justifyContent:'flex-end' }}>
-                  <Skeleton variant="rounded" width={96} height={36} />
-                </Box>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-      {error && (
-        <Paper sx={{ p:2, mb:2, color:'error.main' }}>{error}</Paper>
-      )}
-      {!loading && !error && filtered.length === 0 && (
-        <Paper sx={{ p:4, mb:4, display:'flex', gap:2, alignItems:'center', borderRadius:3 }}>
-          <ErrorOutlineIcon color="action" />
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold">Không có quiz nào phù hợp</Typography>
-            <Typography variant="body2" color="text.secondary">Hãy điều chỉnh từ khóa tìm kiếm hoặc chọn "Tất cả" ở bộ lọc độ khó.</Typography>
-          </Box>
-        </Paper>
-      )}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {filtered.map(q => {
-          const theme = getDifficultyTheme(q.difficulty);
-          return (
-            <Grid key={q.quiz_id} item xs={12} md={6} xl={4}>
-              <Card
-                onClick={()=>navigate(`/quizzes/take/${q.quiz_id}`)}
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                  background: '#ffffff',
-                  border: '1px solid #f1f5f9',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': {
-                    transform: 'translateY(-8px)',
-                    boxShadow: `0 20px 40px ${theme.shadow}, 0 0 0 1px ${theme.border}`,
-                    '& .quiz-icon-wrapper': {
-                      transform: 'scale(1.1) rotate(5deg)',
-                      boxShadow: `0 12px 24px ${theme.shadow}`
-                    },
-                    '& .start-button': {
-                      transform: 'translateX(4px)',
-                      paddingRight: '24px'
-                    }
-                  }
-                }}
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 p-6 text-white shadow-smooth">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_45%)] opacity-70" />
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
+          <div className="space-y-4 md:flex-1">
+            <p className="text-sm uppercase tracking-[0.3em] text-white/60">Trung tâm bài kiểm tra</p>
+            <h1 className="font-heading text-3xl font-bold leading-tight md:text-4xl">
+              Quiz & Bài tập tương tác dành cho bạn
+            </h1>
+            <p className="max-w-3xl text-base text-white/80">
+              Chọn ngay một bài quiz để luyện tập kiến thức Lịch sử Lâm Đồng. Giao diện mới sử dụng Tailwind + shadcn/ui
+              giúp trải nghiệm thống nhất với hệ thống.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleRandomQuiz} className="rounded-2xl bg-white text-slate-900 hover:bg-white/90">
+                <Shuffle className="mr-2 h-4 w-4" />
+                Quiz ngẫu nhiên
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleClearFilters}
+                className="rounded-2xl border border-white/30 bg-white/10 text-white hover:bg-white/20"
               >
-                {/* Top colored bar */}
-                <Box sx={{ 
-                  height: 5,
-                  background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})`,
-                  position: 'relative',
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: `linear-gradient(90deg, transparent, ${theme.primary}40, transparent)`,
-                    animation: 'shimmer 2s infinite',
-                  },
-                  '@keyframes shimmer': {
-                    '0%': { transform: 'translateX(-100%)' },
-                    '100%': { transform: 'translateX(100%)' }
-                  }
-                }} />
+                Đặt lại bộ lọc
+              </Button>
+            </div>
+          </div>
+          <div className="grid flex-1 gap-4 sm:grid-cols-3">
+            <HeroStat label="Bài hiển thị" value={stats.shown} />
+            <HeroStat label="Thời lượng TB" value={`${stats.avgDuration}′`} />
+            <HeroStat label="Câu hỏi tổng" value={stats.totalQuestions} />
+          </div>
+        </div>
+        {featured.length > 0 && (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {featured.map((quiz, idx) => (
+              <div
+                key={`featured-${idx}`}
+                className="rounded-2xl bg-white/80 p-4 text-slate-900 shadow-lg transition hover:shadow-xl"
+              >
+                <p className="text-xs uppercase tracking-wide text-slate-500">Nổi bật</p>
+                <p className="mt-1 font-heading text-lg font-semibold">{quiz.title}</p>
+                <p className="line-clamp-2 text-sm text-slate-600">{quiz.description || 'Khám phá ngay.'}</p>
+                <Button
+                  size="sm"
+                  className="mt-3 rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                  onClick={() => handleOpenQuiz(quiz)}
+                >
+                  Vào thi
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-                <CardContent sx={{ p: 0, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                  {/* Header section */}
-                  <Box sx={{ p: 3, pb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, mb: 2 }}>
-                      {/* Quiz icon */}
-                      <Box 
-                        className="quiz-icon-wrapper"
-                        sx={{ 
-                          width: 72,
-                          height: 72,
-                          borderRadius: 2.5,
-                          background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          boxShadow: `0 8px 16px ${theme.shadow}`,
-                          transition: 'all 0.3s ease',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.2), transparent)',
-                            opacity: 0.8
-                          }
-                        }}
-                      >
-                        <QuizIcon sx={{ color: 'white', fontSize: 36, zIndex: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
-                      </Box>
-                      
-                      {/* Title and meta */}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontWeight: 800,
-                            fontSize: '1.15rem',
-                            color: '#1e293b',
-                            mb: 1,
-                            lineHeight: 1.3,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            letterSpacing: '-0.02em'
-                          }}
-                        >
-                          {q.title}
-                        </Typography>
-                        
-                        {/* Lesson and creator info */}
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          {q.lesson_title && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <SchoolIcon sx={{ fontSize: 14, color: '#64748b' }} />
-                              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>
-                                {q.lesson_title}
-                              </Typography>
-                            </Box>
-                          )}
-                          {q.creator_name && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: theme.light, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: theme.primary }}>
-                                  {q.creator_name.charAt(0).toUpperCase()}
-                                </Typography>
-                              </Box>
-                              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.75rem' }}>
-                                {q.creator_name}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </Box>
-                    
-                    {/* Description */}
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        color: '#64748b',
-                        lineHeight: 1.6,
-                        fontSize: '0.875rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        mb: 2.5
-                      }}
-                    >
-                      {q.description}
-                    </Typography>
-                    
-                    {/* Tags row */}
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      <Chip 
-                        size="small" 
-                        icon={<HelpIcon sx={{ fontSize: 15 }} />}
-                        label="Quiz" 
-                        sx={{ 
-                          height: 26,
-                          bgcolor: '#eff6ff',
-                          color: '#2563eb',
-                          fontWeight: 700,
-                          fontSize: '0.75rem',
-                          border: '1.5px solid #bfdbfe',
-                          '& .MuiChip-icon': { color: '#2563eb', marginLeft: '6px' }
-                        }} 
-                      />
-                      <Chip 
-                        size="small" 
-                        icon={<TimerIcon sx={{ fontSize: 15 }} />}
-                        label={`${q.time_limit || 0} phút`} 
-                        sx={{ 
-                          height: 26,
-                          bgcolor: '#fff7ed',
-                          color: '#ea580c',
-                          fontWeight: 700,
-                          fontSize: '0.75rem',
-                          border: '1.5px solid #fed7aa',
-                          '& .MuiChip-icon': { color: '#ea580c', marginLeft: '6px' }
-                        }} 
-                      />
-                      <Chip 
-                        size="small" 
-                        label={q.difficulty} 
-                        sx={{ 
-                          height: 26,
-                          bgcolor: theme.light,
-                          color: theme.primary,
-                          fontWeight: 800,
-                          fontSize: '0.7rem',
-                          border: `1.5px solid ${theme.border}`,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px'
-                        }} 
-                      />
-                    </Box>
-                  </Box>
+      <section className="rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-sm backdrop-blur">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm theo tiêu đề, mô tả, chủ đề..."
+                className="h-12 pl-12"
+              />
+            </div>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-                  {/* Divider */}
-                  <Box sx={{ px: 3, mt: 'auto' }}>
-                    <Box sx={{ 
-                      height: 1,
-                      background: `linear-gradient(90deg, transparent, ${theme.border}60, transparent)`
-                    }} />
-                  </Box>
+          <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-slate-500">Độ khó:</span>
+            {difficultyFilters.map((level) => {
+              const active = difficulty === level;
+              return (
+                <Button
+                  key={level}
+                  variant={active ? 'default' : 'secondary'}
+                  className={cn(
+                    'rounded-2xl text-sm',
+                    active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                  )}
+                  onClick={() => setDifficulty(active ? '' : level)}
+                >
+                  <Filter className="mr-2 h-4 w-4" />
+                  {level}
+                </Button>
+              );
+            })}
+          </div>
 
-                  {/* Footer */}
-                  <Box sx={{ p: 3, pt: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {/* Status indicator */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ 
-                        width: 8, 
-                        height: 8, 
-                        borderRadius: '50%', 
-                        bgcolor: theme.primary,
-                        boxShadow: `0 0 0 3px ${theme.light}`,
-                        animation: 'pulse-dot 2s ease-in-out infinite',
-                        '@keyframes pulse-dot': {
-                          '0%, 100%': { opacity: 1 },
-                          '50%': { opacity: 0.5 }
-                        }
-                      }} />
-                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem' }}>
-                        Sẵn sàng
-                      </Typography>
-                    </Box>
-                    
-                    {/* Start button */}
-                    <Button 
-                      className="start-button"
-                      variant="contained"
-                      size="small"
-                      endIcon={<NavigateNext />}
-                      sx={{
-                        background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
-                        boxShadow: `0 4px 12px ${theme.shadow}`,
-                        borderRadius: 2,
-                        px: 2.5,
-                        py: 0.75,
-                        fontWeight: 700,
-                        fontSize: '0.875rem',
-                        textTransform: 'none',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          background: `linear-gradient(135deg, ${theme.secondary}, ${theme.primary})`,
-                          boxShadow: `0 6px 16px ${theme.shadow}`
-                        }
-                      }}
-                    >
-                      Bắt đầu
-                    </Button>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          )
-        })}
-      </Grid>
-    </Box>
+          {(search || difficulty || sort !== 'fresh') && (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+              Đang áp dụng bộ lọc nâng cao.{' '}
+              <button
+                className="font-semibold text-slate-900 underline-offset-2 hover:underline"
+                onClick={handleClearFilters}
+              >
+                Xóa tất cả
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <InsightCard
+          icon={<Sparkles className="h-5 w-5 text-emerald-600" />}
+          title="Chủ đề nổi bật"
+          value={stats.topCategory || 'Đang cập nhật'}
+          description="Dựa trên số lượng quiz hiện có"
+        />
+        <InsightCard
+          icon={<Timer className="h-5 w-5 text-amber-500" />}
+          title="Thời lượng khuyến nghị"
+          value={`${stats.avgDuration} phút`}
+          description="Phù hợp cho mỗi buổi học"
+        />
+        <InsightCard
+          icon={<BarChart3 className="h-5 w-5 text-indigo-500" />}
+          title="Tổng câu hỏi"
+          value={stats.totalQuestions}
+          description="Bao gồm các bài luyện tập"
+        />
+      </section>
+
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[...Array(6)].map((_, idx) => (
+            <div key={`skeleton-${idx}`} className="h-64 animate-pulse rounded-3xl bg-slate-200/60" />
+          ))}
+        </div>
+      ) : sorted.length ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{sorted.map(renderQuizCard)}</div>
+      ) : (
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-10 text-center">
+          <AlarmClock className="mx-auto h-10 w-10 text-slate-400" />
+          <p className="mt-3 text-lg font-semibold text-slate-700">Không tìm thấy quiz nào</p>
+          <p className="text-sm text-slate-500">Hãy thử bỏ chọn bộ lọc để xem thêm gợi ý.</p>
+        </div>
+      )}
+    </div>
   );
 };
+
+const MiniStat = ({ icon, label, value }) => (
+  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-2 text-center">
+    <div className="flex items-center justify-center gap-1 text-xs text-slate-500">
+      {icon}
+      {label}
+    </div>
+    <p className="mt-1 text-sm font-semibold text-slate-800">{value}</p>
+  </div>
+);
+
+const HeroStat = ({ label, value }) => (
+  <div className="rounded-2xl border border-white/20 bg-white/10 p-4 text-center">
+    <p className="text-xs uppercase tracking-widest text-white/70">{label}</p>
+    <p className="mt-1 text-3xl font-black">{value}</p>
+  </div>
+);
+
+const InsightCard = ({ icon, title, value, description }) => (
+  <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+    <div className="flex items-center gap-3">
+      <div className="rounded-2xl bg-slate-100 p-3">{icon}</div>
+      <div>
+        <p className="text-sm font-semibold text-slate-500">{title}</p>
+        <p className="text-xl font-bold text-slate-900">{value}</p>
+      </div>
+    </div>
+    <p className="mt-3 text-sm text-slate-500">{description}</p>
+  </div>
+);
 
 export default QuizzesIndex;

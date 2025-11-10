@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './app/App.jsx';
+import './index.css';
 
 // Enhanced modern theme with gradients and animations
 const theme = createTheme({
