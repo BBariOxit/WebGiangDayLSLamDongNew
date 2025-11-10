@@ -1,0 +1,55 @@
+@startuml WebGiangDayLSLamDong_Activity
+
+!theme plain
+title He thong Giang day Lich su Lam Dong - Tong Quan Quy Trinh Hoat Dong
+
+skinparam ActivityBackgroundColor #E1BEE7
+skinparam ActivityBorderColor #7B1FA2
+skinparam ActivityBorderThickness 2
+skinparam ArrowColor #0277BD
+skinparam ArrowThickness 2
+
+start
+
+:Nguoi dung truy cap;
+
+if (Da dang nhap?) then (Khong)
+    :Dang nhap/Dang ky;
+else (Co)
+    :Dang nhap roi;
+endif
+
+:Vao He thong;
+
+if (Vai tro?) then (Admin)
+    :Quan ly TAT CA noi dung;
+    :- CRUD Bai hoc;
+    :- CRUD Bai Kiem Tra;
+    :- Xem Thong ke He thong;
+    
+else if (Giao Vien) then
+    :Quan ly noi dung RIENG;
+    :- CRUD Bai hoc cua toi;
+    :- CRUD Bai Kiem Tra cua toi;
+    :- Xem Tien do Hoc sinh;
+    
+else (Hoc Sinh)
+    :Hoc tap;
+    :- Xem danh sach Bai hoc;
+    :- Xem chi tiet Bai hoc;
+    :- Xem danh sach Bai Kiem Tra;
+    :- Lam Bai Kiem Tra;
+    :- Xem Ket qua;
+endif
+
+:Xem Dashboard ca nhan;
+
+if (Muon tiep tuc?) then (Co)
+    :Quay lai Bu1;
+else (Khong)
+    :Dang xuat;
+endif
+
+stop
+
+@enduml

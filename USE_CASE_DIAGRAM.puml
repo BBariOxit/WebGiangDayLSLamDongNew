@@ -1,0 +1,58 @@
+@startuml WebGiangDayLSLamDong_Overview
+
+!theme plain
+left to right direction
+
+skinparam backgroundColor #FFFFFF
+skinparam actor {
+    BackgroundColor #B4E7FF
+    BorderColor #0277BD
+    BorderThickness 2
+}
+skinparam usecase {
+    BackgroundColor #E1BEE7
+    BorderColor #7B1FA2
+    BorderThickness 2
+}
+skinparam rectangle {
+    BackgroundColor #FAFAFA
+    BorderColor #333333
+    BorderThickness 2
+}
+
+actor "Admin\n(Toan Quyen)" as Admin
+actor "Teacher\n(Giao Vien)" as Teacher  
+actor "Student\n(Hoc Sinh)" as Student
+
+rectangle "He thong Giang day Lich su Lam Dong" {
+    
+    usecase "Xac thuc" as Auth
+    
+    usecase "Quan ly\nTat ca Bai hoc" as LessonMgmtAll
+    usecase "Quan ly\nBai hoc cua toi" as LessonMgmtOwn
+    usecase "Xem Bai\nhoc" as LessonView
+    
+    usecase "Quan ly\nTat ca Bai KT" as QuizMgmtAll
+    usecase "Quan ly\nBai KT cua toi" as QuizMgmtOwn
+    usecase "Lam Bai\nKiem Tra" as QuizTake
+    
+    usecase "Dashboard" as Dashboard
+}
+
+Admin --> Auth
+Teacher --> Auth
+Student --> Auth
+
+Admin --> LessonMgmtAll
+Teacher --> LessonMgmtOwn
+Student --> LessonView
+
+Admin --> QuizMgmtAll
+Teacher --> QuizMgmtOwn
+Student --> QuizTake
+
+Admin --> Dashboard
+Teacher --> Dashboard
+Student --> Dashboard
+
+@enduml
