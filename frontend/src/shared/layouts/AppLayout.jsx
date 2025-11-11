@@ -186,14 +186,16 @@ const AppLayout = () => {
     const type = notif?.type;
     const data = normalizeNotificationData(notif?.data);
     const assessmentType = (data?.assessmentType || '').toLowerCase();
-    const assessmentColors = {
-      quiz: 'bg-indigo-100 text-indigo-700',
-      'trắc nghiệm 1 đáp án': 'bg-indigo-100 text-indigo-700',
-      multi_choice: 'bg-pink-100 text-pink-700',
-      'trắc nghiệm nhiều đáp án': 'bg-pink-100 text-pink-700',
-      fill_blank: 'bg-emerald-100 text-emerald-700',
-      'điền đáp án': 'bg-emerald-100 text-emerald-700'
-    };
+      const assessmentColors = {
+        quiz: 'bg-indigo-100 text-indigo-700',
+        'trắc nghiệm 1 đáp án': 'bg-indigo-100 text-indigo-700',
+        multi_choice: 'bg-pink-100 text-pink-700',
+        'trắc nghiệm nhiều đáp án': 'bg-pink-100 text-pink-700',
+        fill_blank: 'bg-emerald-100 text-emerald-700',
+        'điền đáp án': 'bg-emerald-100 text-emerald-700',
+        mixed: 'bg-violet-100 text-violet-700',
+        'kiểu hỗn hợp': 'bg-violet-100 text-violet-700'
+      };
     switch (type) {
       case 'new_quiz':
         return {

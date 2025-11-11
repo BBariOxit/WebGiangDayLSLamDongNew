@@ -15,7 +15,7 @@ const createQuizSchema = Joi.object({
   lessonId: Joi.number().integer().allow(null),
   difficulty: Joi.string().allow('', null),
   timeLimit: Joi.number().integer().min(1).allow(null),
-  assessmentType: Joi.string().valid('quiz', 'multi_choice', 'fill_blank').default('quiz'),
+  assessmentType: Joi.string().valid('quiz', 'multi_choice', 'fill_blank', 'mixed').default('quiz'),
   questions: Joi.array().items(
     Joi.object({
       questionText: Joi.string().required(),

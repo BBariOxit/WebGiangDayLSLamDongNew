@@ -15,7 +15,16 @@ function ensureCanEdit(user) {
   if (!['admin', 'teacher'].includes(role)) throw new Error('Forbidden');
 }
 
-const DEFAULT_ASSESSMENT_TYPES = new Set(['quiz', 'multi_choice', 'fill_blank']);
+const DEFAULT_ASSESSMENT_TYPES = new Set(['quiz', 'multi_choice', 'fill_blank', 'mixed']);
+const QUESTION_TYPES = new Set(['single_choice', 'multi_select', 'fill_blank']);
+
+function resolveQuestionTypeValue(question, fallbackAssessmentType) {
+  const raw = (question?.questionType || question?.question_type || '').toLowerCase();
+  if (QUESTION_TYPES.has(raw)) return raw;
+  if (fallbackAssessmentType === 'fill_blank') return 'fill_blank';
+  if (fallbackAssessmentType === 'multi_choice') return 'multi_select';
+  return 'single_choice';
+}
 export const SCHEMA_OUTDATED_ERROR = 'DB_SCHEMA_OUTDATED';
 
 function normalizeQuestions(rawQuestions, { requireAtLeastOne = true, assessmentType = 'quiz' } = {}) {
@@ -35,7 +44,9 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true, assessment
     const points = Number.isFinite(Number(q.points)) && Number(q.points) > 0 ? Number(q.points) : 1;
     const explanation = q.explanation || null;
 
-    if (quizType === 'fill_blank' || (q.questionType === 'fill_blank')) {
+    const targetQuestionType = resolveQuestionTypeValue(q, quizType);
+
+    if (targetQuestionType === 'fill_blank') {
       const rawAccepted = Array.isArray(q.acceptedAnswers)
         ? q.acceptedAnswers
         : Array.isArray(q.answers)
@@ -85,7 +96,7 @@ function normalizeQuestions(rawQuestions, { requireAtLeastOne = true, assessment
       continue;
     }
 
-    if (quizType === 'multi_choice' || q.questionType === 'multi_select') {
+    if (targetQuestionType === 'multi_select') {
       const correctIndexes = answers
         .map((ans, idx) => (ans.isCorrect ? idx : null))
         .filter(idx => idx !== null);

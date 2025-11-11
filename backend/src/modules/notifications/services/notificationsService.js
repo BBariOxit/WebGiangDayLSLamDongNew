@@ -9,7 +9,8 @@ function truncate(text, max=180){
 const ASSESSMENT_LABELS = {
   quiz: 'Trắc nghiệm 1 đáp án',
   multi_choice: 'Trắc nghiệm nhiều đáp án',
-  fill_blank: 'Điền đáp án'
+  fill_blank: 'Điền đáp án',
+  mixed: 'Quiz hỗn hợp'
 };
 
 function parseDataField(value) {
@@ -38,7 +39,8 @@ export async function publishNewQuizNotification(quiz) {
   const assessmentLabels = {
     quiz: 'Trắc nghiệm 1 đáp án',
     multi_choice: 'Trắc nghiệm nhiều đáp án',
-    fill_blank: 'Điền đáp án'
+    fill_blank: 'Điền đáp án',
+    mixed: 'Quiz hỗn hợp'
   };
   const assessmentLabel = assessmentLabels[assessmentType] || 'Bài kiểm tra';
   return createNotification({
