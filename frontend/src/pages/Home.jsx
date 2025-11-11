@@ -61,13 +61,18 @@ const Home = () => {
             } else if (typeof lesson.images === 'object') parsedImages = lesson.images;
           }
           if (Array.isArray(parsedImages)) parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
+          const avgRating = lesson.avg_rating ?? lesson.average_rating ?? lesson.rating;
+          const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
+          const hasRatings = ratingCount > 0 && avgRating !== null && avgRating !== undefined && !Number.isNaN(parseFloat(avgRating));
+          const ratingValue = hasRatings ? Math.round(parseFloat(avgRating) * 10) / 10 : 5;
           return {
             id: lesson.lesson_id,
             slug: lesson.slug,
             title: lesson.title,
             summary: lesson.summary || '',
             duration: lesson.duration || '25 phút',
-            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
+            rating: ratingValue,
+            ratingCount,
             studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
             difficulty: lesson.difficulty || 'Cơ bản',
             category: lesson.category || 'Lịch sử địa phương',
@@ -103,7 +108,10 @@ const Home = () => {
     return sum + (m ? parseInt(m[0], 10) : 0);
   }, 0);
   const totalStudySessions = lessons.reduce((sum, l) => sum + (l.studyCount || 0), 0);
-  const averageRating = lessons.length ? (lessons.reduce((s, l) => s + (l.rating || 0), 0) / lessons.length).toFixed(1) : '0.0';
+  const ratedLessons = lessons.filter((lesson) => typeof lesson.rating === 'number' && !Number.isNaN(lesson.rating));
+  const averageRating = ratedLessons.length
+    ? (ratedLessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / ratedLessons.length).toFixed(1)
+    : '0.0';
   const stats = [
   { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#2196f3' },
   { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },

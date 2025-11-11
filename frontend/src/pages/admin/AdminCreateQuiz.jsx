@@ -906,13 +906,18 @@ const AdminCreateQuiz = () => {
               </CardContent>
             </Card>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {editingQuizId && (
                 <Button type="button" variant="ghost" className="rounded-2xl px-6" onClick={handleCancelEdit} disabled={saving}>
                   Hủy chỉnh sửa
                 </Button>
               )}
-              <Button type="button" className="rounded-2xl px-6" onClick={handleSave} disabled={saving}>
+              <Button
+                type="button"
+                className="rounded-2xl px-10 py-3 text-base font-semibold shadow-lg"
+                onClick={handleSave}
+                disabled={saving}
+              >
                 {saving ? 'Đang lưu...' : editingQuizId ? 'Cập nhật bài kiểm tra' : 'Tạo bài kiểm tra'}
               </Button>
             </div>

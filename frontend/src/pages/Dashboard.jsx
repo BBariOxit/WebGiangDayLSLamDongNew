@@ -72,6 +72,9 @@ const Dashboard = () => {
             else if (typeof lesson.images === 'object') parsedImages = lesson.images;
           }
           if (Array.isArray(parsedImages)) parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
+          const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
+          const hasRatings = ratingCount > 0 && lesson.rating !== null && lesson.rating !== undefined;
+          const ratingValue = hasRatings ? Math.round((lesson.rating || 0) * 10) / 10 : 5;
           return {
             id: lesson.lesson_id,
             slug: lesson.slug,
@@ -81,7 +84,8 @@ const Dashboard = () => {
             duration: lesson.duration || '25 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
             category: lesson.category || 'Lịch sử địa phương',
-            rating: parseFloat(lesson.rating || lesson.avg_rating) || 0,
+            rating: ratingValue,
+            ratingCount,
             studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
             progress: 0,
             images: parsedImages,
@@ -110,7 +114,11 @@ const Dashboard = () => {
           return sum + (m ? parseInt(m[0], 10) : 0);
         }, 0);
         const totalQuizzes = globals?.total_quizzes ?? 0;
-        const averageRating = globals?.avg_rating ? Number(globals.avg_rating) : (normalized.length ? (normalized.reduce((s, l) => s + (l.rating || 0), 0) / normalized.length) : 0);
+        const averageRating = globals?.avg_rating
+          ? Number(globals.avg_rating)
+          : (normalized.length
+              ? (normalized.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / normalized.length)
+              : 0);
         setTargetStats([totalLessons, totalMinutes, totalQuizzes, Math.round(averageRating * 10)]);
       } catch (e) {
         if (mounted) setError(e.message || 'Không thể tải dữ liệu bảng điều khiển');

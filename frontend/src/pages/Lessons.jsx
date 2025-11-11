@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -73,11 +73,14 @@ const fallbackSvgDataUri = (text = 'Bài học') => {
   return `data:image/svg+xml;utf8,${svg}`;
 };
 
+const INITIAL_VISIBLE_LESSONS = 9;
+
 const Lessons = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [lessons, setLessons] = useState([]);
   const [filteredLessons, setFilteredLessons] = useState([]);
+  const [visibleLessons, setVisibleLessons] = useState(INITIAL_VISIBLE_LESSONS);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
@@ -87,6 +90,9 @@ const Lessons = () => {
   const [bookmarkedLessons, setBookmarkedLessons] = useState(new Set());
   const [progressLookup, setProgressLookup] = useState(new Map());
   const [error, setError] = useState(null);
+  const averageRating = lessons.length
+    ? Math.round((lessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / lessons.length) * 10) / 10
+    : 0;
 
   // Fetch lessons from API
   useEffect(() => {
@@ -151,9 +157,10 @@ const Lessons = () => {
             parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
           }
 
-          const avg = parseFloat(lesson.avg_rating ?? lesson.rating ?? 0) || 0;
+          const avg = parseFloat(lesson.avg_rating ?? lesson.rating ?? 5);
           const rcount = Number(lesson.rating_count ?? 0);
-          const computedRating = rcount === 0 ? 5.0 : Math.round(avg * 10) / 10;
+          const hasRating = !Number.isNaN(avg) && avg !== null && avg !== undefined;
+          const computedRating = hasRating ? Math.round(avg * 10) / 10 : 5;
           const progressInfo = progressMap.get(Number(lesson.lesson_id)) || {};
           const isCompleted = !!progressInfo.isCompleted;
           const progressPercent = isCompleted ? 100 : Number(progressInfo.progress ?? 0);
@@ -253,7 +260,7 @@ const Lessons = () => {
         filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
         break;
       case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
+        filtered.sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
         break;
       case 'popular':
   filtered.sort((a, b) => (b.studyCount || 0) - (a.studyCount || 0));
@@ -270,6 +277,10 @@ const Lessons = () => {
 
     setFilteredLessons(filtered);
   }, [lessons, searchTerm, selectedCategory, selectedDifficulty, sortBy, tabValue, bookmarkedLessons]);
+
+  useEffect(() => {
+    setVisibleLessons(INITIAL_VISIBLE_LESSONS);
+  }, [searchTerm, selectedCategory, selectedDifficulty, sortBy, tabValue, lessons.length]);
 
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
@@ -316,6 +327,7 @@ const Lessons = () => {
 
   const categories = [...new Set(lessons.map(lesson => lesson.category))];
   const difficulties = ['Cơ bản', 'Trung bình', 'Nâng cao'];
+  const displayedLessons = filteredLessons.slice(0, visibleLessons);
 
   if (loading) {
     return (
@@ -499,7 +511,7 @@ const Lessons = () => {
         </Paper>
       ) : (
         <Grid container spacing={3}>
-          {filteredLessons.map((lesson, index) => {
+          {displayedLessons.map((lesson, index) => {
             const isLocked = !user && lesson.id > 1;
             const isBookmarked = bookmarkedLessons.has(lesson.id);
 
@@ -672,7 +684,7 @@ const Lessons = () => {
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Star fontSize="small" sx={{ color: '#ffb400' }} />
-                          <Typography variant="caption">{lesson.rating}</Typography>
+                          <Typography variant="caption">{lesson.rating ?? 5}</Typography>
                         </Box>
                         {lesson.isCompleted && (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -749,6 +761,25 @@ const Lessons = () => {
         </Grid>
       )}
 
+      {filteredLessons.length > INITIAL_VISIBLE_LESSONS && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          {visibleLessons < filteredLessons.length ? (
+            <Button
+              variant="outlined"
+              onClick={() =>
+                setVisibleLessons((prev) => Math.min(prev + INITIAL_VISIBLE_LESSONS, filteredLessons.length))
+              }
+            >
+              Xem thêm ({filteredLessons.length - visibleLessons})
+            </Button>
+          ) : (
+            <Button variant="outlined" onClick={() => setVisibleLessons(INITIAL_VISIBLE_LESSONS)}>
+              Thu gọn
+            </Button>
+          )}
+        </Box>
+      )}
+
       {/* Statistics */}
       <Paper elevation={2} sx={{ mt: 6, p: 4, borderRadius: 3, textAlign: 'center' }}>
         <Typography variant="h6" gutterBottom>
@@ -785,7 +816,7 @@ const Lessons = () => {
           <Grid item xs={12} sm={3}>
             <Box>
               <Typography variant="h4" color="warning.main" fontWeight="bold">
-                {Math.round(lessons.reduce((sum, lesson, _, arr) => sum + lesson.rating, 0) / lessons.length * 10) / 10}
+                {averageRating}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Đánh giá trung bình

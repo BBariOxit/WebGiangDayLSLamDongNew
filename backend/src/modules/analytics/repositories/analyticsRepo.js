@@ -2,10 +2,25 @@ import { query } from '../../../config/pool.js';
 
 export async function getGlobalStats() {
   const sql = `
+    WITH lesson_rating_summary AS (
+      SELECT 
+        l.lesson_id,
+        CASE 
+          WHEN COALESCE(rs.rating_count, 0) = 0 THEN 5::numeric(4,2)
+          ELSE COALESCE(rs.avg_rating, 5)::numeric(4,2)
+        END AS rating_value
+      FROM lessons l
+      LEFT JOIN (
+        SELECT lesson_id, AVG(rating)::numeric(4,2) AS avg_rating, COUNT(rating) AS rating_count
+        FROM lesson_comments
+        WHERE rating IS NOT NULL
+        GROUP BY lesson_id
+      ) rs ON rs.lesson_id = l.lesson_id
+    )
     SELECT 
-  (SELECT COUNT(*) FROM lessons) AS total_lessons,
-  (SELECT COALESCE(SUM(study_sessions_count),0) FROM lessons) AS total_study_sessions,
-      (SELECT COALESCE(AVG(rating),0) FROM lessons) AS avg_rating,
+      (SELECT COUNT(*) FROM lessons) AS total_lessons,
+      (SELECT COALESCE(SUM(study_sessions_count),0) FROM lessons) AS total_study_sessions,
+      COALESCE((SELECT AVG(rating_value) FROM lesson_rating_summary WHERE rating_value IS NOT NULL), 0) AS avg_rating,
       (SELECT COUNT(*) FROM quizzes) AS total_quizzes,
       (SELECT COUNT(*) FROM quiz_attempts) AS total_attempts
   `;

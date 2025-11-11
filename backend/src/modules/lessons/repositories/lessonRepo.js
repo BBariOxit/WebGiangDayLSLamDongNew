@@ -88,10 +88,24 @@ export async function listLessons({ q, publishedOnly, limit = 20, offset = 0 }) 
   if (publishedOnly) { clauses.push(`is_published = true`); }
   const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
   // Include rating summary (avg_rating, rating_count) via materialized view when available
+  const ratingSubquery = `
+    SELECT lesson_id,
+           ROUND(AVG(rating)::numeric, 1) AS avg_rating,
+           COUNT(rating) AS rating_count
+    FROM lesson_comments
+    WHERE rating IS NOT NULL
+    GROUP BY lesson_id
+  `;
   const sql = `
-    SELECT l.*, rs.avg_rating, rs.rating_count
+    SELECT 
+      l.*,
+      CASE 
+        WHEN COALESCE(rs.rating_count, 0) = 0 THEN 5::numeric(4,2)
+        ELSE COALESCE(rs.avg_rating, 5)::numeric(4,2)
+      END AS avg_rating,
+      COALESCE(rs.rating_count, 0) AS rating_count
     FROM lessons l
-    LEFT JOIN lesson_rating_summary rs ON rs.lesson_id = l.lesson_id
+    LEFT JOIN (${ratingSubquery}) rs ON rs.lesson_id = l.lesson_id
     ${where ? where.replace(/^WHERE /, 'WHERE ') : ''}
     ORDER BY l.lesson_id DESC
     LIMIT $${idx} OFFSET $${idx + 1}
