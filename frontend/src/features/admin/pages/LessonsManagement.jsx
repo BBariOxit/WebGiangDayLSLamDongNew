@@ -37,7 +37,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 const DIFFICULTY_OPTIONS = ['Cơ bản', 'Trung bình', 'Nâng cao'];
@@ -224,10 +223,25 @@ const LessonsManagement = () => {
         tags: Array.isArray(data.tags) ? data.tags : [],
         images: parseImages(data.images),
         sections: Array.isArray(data.sections)
-          ? data.sections.map((section, idx) => ({
-              ...section,
-              orderIndex: Number(section.orderIndex ?? section.order_index ?? idx)
-            }))
+          ? data.sections
+              .map((section, idx) => {
+                let sectionData = section.data;
+                if (typeof sectionData === 'string') {
+                  try {
+                    sectionData = JSON.parse(sectionData);
+                  } catch {
+                    sectionData = {};
+                  }
+                }
+                return {
+                  type: section.type || 'text',
+                  title: section.title || '',
+                  contentHtml: section.contentHtml ?? section.content_html ?? '',
+                  data: sectionData || {},
+                  orderIndex: Number(section.orderIndex ?? section.order_index ?? idx)
+                };
+              })
+              .sort((a, b) => a.orderIndex - b.orderIndex)
           : []
       });
       try {
@@ -649,14 +663,17 @@ const LessonsManagement = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen space-y-8 bg-gradient-to-b from-slate-50 via-white to-slate-50 px-4 pb-16 pt-8 sm:px-6 lg:px-12">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-100 bg-white/90 px-6 py-5 shadow-smooth backdrop-blur">
         <div>
-          <p className="text-sm font-semibold text-indigo-500 uppercase tracking-wide">Quản lý nội dung</p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-900">Bài học &amp; nội dung số</h1>
-          <p className="text-sm text-slate-500">Tạo, chỉnh sửa và xuất bản bài học cùng bài kiểm tra đi kèm.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500">Quản lý nội dung</p>
+          <h1 className="mt-2 text-4xl font-semibold text-slate-900">Bài học &amp; nội dung số</h1>
+          <p className="mt-1 text-sm text-slate-500">Tạo, chỉnh sửa và xuất bản bài học cùng bài kiểm tra đi kèm.</p>
         </div>
-        <Button onClick={handleOpenCreate} className="gap-2 rounded-full px-6 shadow-lg shadow-indigo-500/30">
+        <Button
+          onClick={handleOpenCreate}
+          className="gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 px-6 py-5 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 hover:from-indigo-600 hover:to-violet-600"
+        >
           <Plus className="h-4 w-4" />
           Tạo bài học mới
         </Button>
@@ -673,47 +690,52 @@ const LessonsManagement = () => {
         </div>
       )}
 
-      <div className="rounded-3xl border border-slate-100 bg-white shadow-smooth">
+      <div className="overflow-hidden rounded-[36px] border border-slate-100 bg-white shadow-smooth">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm text-slate-600">
             <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="px-6 py-3">Bài học</th>
-                <th className="px-6 py-3">Tóm tắt</th>
-                <th className="px-6 py-3">Trạng thái</th>
-                <th className="px-6 py-3">Ngày tạo</th>
-                <th className="px-6 py-3 text-right">Thao tác</th>
+              <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <th className="px-8 py-4">Bài học</th>
+                <th className="px-8 py-4">Trạng thái</th>
+                <th className="px-8 py-4">Ngày tạo</th>
+                <th className="px-8 py-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={5} className="px-8 py-16 text-center text-slate-400">
                     <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-slate-300" />
                     Đang tải danh sách...
                   </td>
                 </tr>
               ) : lessons.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                  <td colSpan={5} className="px-8 py-16 text-center text-slate-400">
                     Chưa có bài học nào. Bấm &ldquo;Tạo bài học mới&rdquo; để bắt đầu.
                   </td>
                 </tr>
               ) : (
                 lessons.map((lesson) => (
                   <tr key={lesson.lesson_id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-6 py-4 font-semibold text-slate-900">{lesson.title}</td>
-                    <td className="px-6 py-4 text-slate-500">{lesson.summary || '—'}</td>
-                    <td className="px-6 py-4">{renderStatus(lesson)}</td>
-                    <td className="px-6 py-4 text-slate-500">
+                    <td className="px-8 py-6">
+                      <p className="text-base font-semibold text-slate-900">{lesson.title}</p>
+                      {lesson.summary && (
+                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                          {lesson.summary}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-8 py-6">{renderStatus(lesson)}</td>
+                    <td className="px-8 py-6 text-slate-500">
                       {lesson.created_at ? new Date(lesson.created_at).toLocaleDateString('vi-VN') : '—'}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-8 py-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="rounded-full"
+                          className="rounded-full text-slate-500 hover:bg-indigo-50 hover:text-indigo-600"
                           onClick={() => handleOpenEdit(lesson)}
                           disabled={!canManageLesson(lesson)}
                         >
@@ -761,7 +783,7 @@ const LessonsManagement = () => {
               <TabsList className="w-full justify-between gap-2 rounded-3xl bg-slate-100 p-1">
                 <TabsTrigger value="overview" className="flex-1">Tổng quan</TabsTrigger>
                 <TabsTrigger value="sections" className="flex-1">Nội dung</TabsTrigger>
-                <TabsTrigger value="quiz" className="flex-1">Quiz đi kèm</TabsTrigger>
+                <TabsTrigger value="quiz" className="flex-1">Bài kiểm tra đi kèm</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
@@ -967,7 +989,7 @@ const LessonsManagement = () => {
                     </CardContent>
                   </Card>
 
-                  <ScrollArea className="max-h-[60vh] rounded-3xl border border-slate-100">
+                  <div className="rounded-3xl border border-slate-100">
                     <div className="divide-y divide-slate-100">
                       {formData.sections.length === 0 && (
                         <div className="p-8 text-center text-sm text-slate-400">
@@ -1114,7 +1136,7 @@ const LessonsManagement = () => {
                         </div>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 </div>
               </TabsContent>
 
@@ -1126,7 +1148,7 @@ const LessonsManagement = () => {
                         <div>
                           <CardTitle className="flex items-center gap-2 text-lg">
                             <Layers3 className="h-5 w-5 text-indigo-500" />
-                            Bật quiz đi kèm
+                            Bật bài kiểm tra đi kèm
                           </CardTitle>
                           <CardDescription>Thiết kế bài kiểm tra đi kèm với 3 loại câu hỏi phổ biến.</CardDescription>
                         </div>
