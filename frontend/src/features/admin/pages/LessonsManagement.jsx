@@ -1,70 +1,163 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box, Container, Typography, Button, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, IconButton, Chip, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Switch, FormControlLabel,
-  Alert, CircularProgress, Stack, Tooltip, MenuItem, Select, FormControl,
-  InputLabel, Grid
-} from '@mui/material';
-import {
-  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-  Visibility as VisibilityIcon, Article as ArticleIcon,
-  Close as CloseIcon,
-  Title as TitleIcon,
-  TextFields as TextIcon,
-  Image as ImageIcon,
-  VideoLibrary as VideoIcon,
-  HorizontalRule as DividerIcon,
-  ArrowUpward as ArrowUpIcon,
-  ArrowDownward as ArrowDownIcon
-} from '@mui/icons-material';
-import { lessonService, quizManagementService } from '../../../shared/services/managementService';
-import apiClient from '../../../shared/services/apiClient';
-import Divider from '@mui/material/Divider';
-import { resolveAssetUrl } from '../../../shared/utils/url';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactQuill from 'react-quill';
-import { useAuth } from '../../auth/hooks/useAuth';
+import {
+  BookOpenCheck,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CircleDot,
+  GripVertical,
+  Image as ImageIcon,
+  Layers3,
+  ListChecks,
+  Loader2,
+  Minus,
+  Pencil,
+  Plus,
+  Sparkles,
+  Tag,
+  Trash2,
+  Type,
+  Upload,
+  X
+} from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 
+import { lessonService, quizManagementService } from '../../../shared/services/managementService';
+import apiClient from '../../../shared/services/apiClient';
+import { resolveAssetUrl } from '../../../shared/utils/url';
+import { useAuth } from '../../auth/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+
+const DIFFICULTY_OPTIONS = ['Cơ bản', 'Trung bình', 'Nâng cao'];
+const ASSESSMENT_TYPES = [
+  { value: 'mixed', label: 'Kết hợp', description: 'Kết hợp nhiều dạng câu hỏi', accent: 'from-fuchsia-500 to-violet-500' },
+  { value: 'quiz', label: '1 đáp án', description: 'Trắc nghiệm 1 đáp án đúng', accent: 'from-indigo-500 to-blue-500' },
+  { value: 'multi_choice', label: 'Nhiều đáp án', description: 'Checkbox, nhiều đáp án đúng', accent: 'from-orange-500 to-rose-500' },
+  { value: 'fill_blank', label: 'Điền chỗ trống', description: 'Nhập đáp án tự do', accent: 'from-emerald-500 to-teal-500' }
+];
+
+const QUESTION_TYPE_OPTIONS = [
+  { value: 'single_choice', label: '1 đáp án', icon: CircleDot, hint: 'Chỉ một đáp án đúng' },
+  { value: 'multi_select', label: 'Nhiều đáp án', icon: ListChecks, hint: 'Có thể chọn nhiều đáp án đúng' },
+  { value: 'fill_blank', label: 'Điền chỗ trống', icon: Type, hint: 'Người học gõ câu trả lời' }
+];
+
+const SECTION_PRESETS = [
+  {
+    type: 'heading',
+    label: 'Tiêu đề chương',
+    description: 'Mở đầu một phần mới với tiêu đề lớn và lời dẫn.',
+    accent: 'from-sky-500 to-indigo-500'
+  },
+  {
+    type: 'text',
+    label: 'Đoạn nội dung',
+    description: 'Đoạn văn, hình ảnh minh họa bằng trình soạn thảo giàu định dạng.',
+    accent: 'from-violet-500 to-purple-500'
+  },
+  {
+    type: 'image_gallery',
+    label: 'Thư viện ảnh',
+    description: 'Tải nhiều hình ảnh cùng chú thích ngắn.',
+    accent: 'from-pink-500 to-rose-500'
+  },
+  {
+    type: 'video',
+    label: 'Video / Embed',
+    description: 'Nhúng video YouTube, Vimeo hoặc file mp4.',
+    accent: 'from-amber-500 to-orange-500'
+  },
+  {
+    type: 'divider',
+    label: 'Ngăn cách',
+    description: 'Tạo khoảng nghỉ giữa các phần.',
+    accent: 'from-slate-500 to-slate-700'
+  }
+];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+const createQuestionTemplate = (questionType = 'single_choice') => {
+  if (questionType === 'fill_blank') {
+    return {
+      id: uid(),
+      questionText: '',
+      questionType: 'fill_blank',
+      acceptedAnswers: [''],
+      answers: [],
+      explanation: '',
+      points: 1
+    };
+  }
+
+  return {
+    id: uid(),
+    questionText: '',
+    questionType,
+    answers: [
+      { id: uid(), answerText: '', isCorrect: true },
+      { id: uid(), answerText: '', isCorrect: false }
+    ],
+    acceptedAnswers: [],
+    explanation: '',
+    points: 1
+  };
+};
+
+const defaultQuizForm = () => ({
+  title: '',
+  description: '',
+  difficulty: 'Cơ bản',
+  timeLimit: 15,
+  assessmentType: 'mixed',
+  questions: [createQuestionTemplate('single_choice')]
+});
+
 const LessonsManagement = () => {
-  const [lessons, setLessons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [editingLesson, setEditingLesson] = useState(null);
-  const [formData, setFormData] = useState({
+  const { user, isTeacher, isAdmin } = useAuth();
+  const buildDefaultLesson = useCallback(() => ({
     title: '',
     summary: '',
     contentHtml: '',
     isPublished: true,
-    instructor: '',
-    duration: '',
+    instructor: isTeacher && user?.name ? user.name : 'Nhóm biên soạn địa phương',
+    duration: '25 phút',
     difficulty: 'Cơ bản',
-    category: '',
+    category: 'Lịch sử địa phương',
     tags: [],
     images: [],
     sections: []
-  });
+  }), [isTeacher, user?.name]);
+
+  const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [editingLesson, setEditingLesson] = useState(null);
+  const [formData, setFormData] = useState(() => buildDefaultLesson());
   const [tagInput, setTagInput] = useState('');
-  // Image picking uses upload only; URL input removed
-  const fileInputRef = React.useRef(null); // main lesson images
-  const sectionFileInputRef = React.useRef(null); // image uploads for a specific section gallery
-  const sectionUploadIndexRef = React.useRef(null); // avoid async state race
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [attachedQuizzes, setAttachedQuizzes] = useState([]);
-  const [sectionUploadIndex, setSectionUploadIndex] = useState(null);
-  // Create attached quiz toggles and form
   const [createQuiz, setCreateQuiz] = useState(false);
-  const [quizForm, setQuizForm] = useState({
-    title: '',
-    description: '',
-    difficulty: 'Cơ bản',
-    timeLimit: 10,
-    questions: [
-      { questionText: '', options: ['', '', '', ''], correctIndex: 0 }
-    ]
-  });
-  const { user, isTeacher, isAdmin } = useAuth();
+  const [quizForm, setQuizForm] = useState(defaultQuizForm);
+  const [listRefreshing, setListRefreshing] = useState(false);
+
+  const coverInputRef = useRef(null);
+  const sectionImageInputRef = useRef(null);
+  const sectionUploadIndexRef = useRef(null);
 
   useEffect(() => {
     loadLessons();
@@ -74,13 +167,13 @@ const LessonsManagement = () => {
     if (!lesson) return false;
     if (isAdmin) return true;
     if (isTeacher && user?.id) {
-      const createdBy = lesson.created_by ?? lesson.createdBy ?? lesson.CreatedBy ?? lesson.createdby ?? null;
+      const createdBy = lesson.created_by ?? lesson.createdBy ?? lesson.CreatedBy ?? null;
       return Number(createdBy) === Number(user.id);
     }
     return false;
   }, [isAdmin, isTeacher, user?.id]);
 
-  const loadLessons = async () => {
+  async function loadLessons() {
     try {
       setLoading(true);
       const res = await lessonService.list();
@@ -90,33 +183,24 @@ const LessonsManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  const resetComposer = useCallback(() => {
+    setFormData(buildDefaultLesson());
+    setQuizForm(defaultQuizForm());
+    setTagInput('');
+    setCreateQuiz(false);
+    setAttachedQuizzes([]);
+    setEditingLesson(null);
+    setActiveTab('overview');
+    sectionUploadIndexRef.current = null;
+    if (coverInputRef.current) coverInputRef.current.value = '';
+    if (sectionImageInputRef.current) sectionImageInputRef.current.value = '';
+  }, [buildDefaultLesson]);
 
   const handleOpenCreate = () => {
-    setEditingLesson(null);
-    setFormData({ 
-      title: '', 
-      summary: '', 
-      contentHtml: '', 
-      isPublished: true,
-      instructor: (isTeacher && user?.name) ? user.name : 'Nhóm biên soạn địa phương',
-      duration: '25 phút',
-      difficulty: 'Cơ bản',
-      category: 'Lịch sử địa phương',
-      tags: [],
-      images: [],
-      sections: []
-    });
-    setCreateQuiz(false);
-    setQuizForm({
-      title: '',
-      description: '',
-      difficulty: 'Cơ bản',
-      timeLimit: 10,
-      questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }]
-    });
-  setTagInput('');
-    setOpenDialog(true);
+    resetComposer();
+    setComposerOpen(true);
   };
 
   const handleOpenEdit = async (lesson) => {
@@ -125,676 +209,1186 @@ const LessonsManagement = () => {
       return;
     }
     try {
+      setListRefreshing(true);
       const res = await lessonService.getById(lesson.lesson_id);
-      const data = res.data;
-      setEditingLesson(data);
+      const data = res.data || res;
       setFormData({
         title: data.title || '',
         summary: data.summary || '',
         contentHtml: data.content_html || '',
         isPublished: data.is_published || false,
-  instructor: data.instructor || ((isTeacher && user?.name) ? user.name : 'Nhóm biên soạn địa phương'),
+        instructor: data.instructor || (isTeacher && user?.name ? user.name : ''),
         duration: data.duration || '25 phút',
         difficulty: data.difficulty || 'Cơ bản',
-        category: data.category || 'Lịch sử địa phương',
+        category: data.category || '',
         tags: Array.isArray(data.tags) ? data.tags : [],
-        images: Array.isArray(data.images) ? data.images : 
-    (typeof data.images === 'string' ? JSON.parse(data.images) : []),
-  sections: Array.isArray(data.sections) ? data.sections : []
+        images: parseImages(data.images),
+        sections: Array.isArray(data.sections)
+          ? data.sections.map((section, idx) => ({
+              ...section,
+              orderIndex: Number(section.orderIndex ?? section.order_index ?? idx)
+            }))
+          : []
       });
-      // Optionally: fetch attached quizzes for this lesson to show quick info
       try {
         const qres = await quizManagementService.list({ lessonId: data.lesson_id });
         setAttachedQuizzes(qres.data || []);
-      } catch {}
-  setTagInput('');
-      setOpenDialog(true);
+      } catch {
+        setAttachedQuizzes([]);
+      }
+      setEditingLesson(data);
+      setComposerOpen(true);
     } catch (e) {
       setError('Không thể tải bài học: ' + e.message);
+    } finally {
+      setListRefreshing(false);
     }
   };
 
-  const handleClose = () => {
-    setOpenDialog(false);
-    setEditingLesson(null);
-    setFormData({ 
-      title: '', 
-      summary: '', 
-      contentHtml: '', 
-      isPublished: true,
-      instructor: '',
-      duration: '',
-      difficulty: 'Cơ bản',
-      category: '',
-      tags: [],
-      images: [],
-      sections: []
-    });
-  setCreateQuiz(false);
-  setQuizForm({ title: '', description: '', difficulty: 'Cơ bản', timeLimit: 10, questions: [{ questionText: '', options: ['', '', '', ''], correctIndex: 0 }] });
-  setTagInput('');
+  const parseImages = (images) => {
+    if (Array.isArray(images)) return images;
+    if (!images) return [];
+    try {
+      const parsed = typeof images === 'string' ? JSON.parse(images) : images;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const handleCloseComposer = (open) => {
+    if (!open) {
+      resetComposer();
+    }
+    setComposerOpen(open);
   };
 
   const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData({ ...formData, tags: [...formData.tags, tagInput.trim()] });
+    if (!tagInput.trim()) return;
+    if (formData.tags.includes(tagInput.trim())) {
       setTagInput('');
+      return;
     }
+    setFormData((prev) => ({ ...prev, tags: [...prev.tags, tagInput.trim()] }));
+    setTagInput('');
   };
 
-  const handleRemoveTag = (tagToRemove) => {
-    setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
+  const handleRemoveTag = (tag) => {
+    setFormData((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }));
   };
 
-  // Removed URL-based add image
-
-  const handlePickImage = () => {
-    // Explicitly reset any pending section upload target
-    setSectionUploadIndex(null);
+  const handleCoverSelect = () => {
     sectionUploadIndexRef.current = null;
-    fileInputRef.current?.click();
+    coverInputRef.current?.click();
   };
 
-  const handlePickSectionImage = (idx) => {
-    setSectionUploadIndex(idx); // for UI binding
-    sectionUploadIndexRef.current = idx; // for deterministic target
-    sectionFileInputRef.current?.click();
+  const handleSectionImageSelect = (idx) => {
+    sectionUploadIndexRef.current = idx;
+    sectionImageInputRef.current?.click();
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
+  const uploadImage = async (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await apiClient.post('/uploads/image', form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return res.data?.data?.url;
+  };
+
+  const handleCoverChange = async (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      const url = res.data?.data?.url; // server returns /uploads/filename
+      const url = await uploadImage(file);
       if (url) {
-        if (sectionUploadIndex !== null && sectionUploadIndex !== undefined) {
-          setFormData(prev => {
-            const arr = [...prev.sections];
-            const imgs = [...(arr[sectionUploadIndex]?.data?.images || [])];
-            imgs.push({ url, caption: '' }); // keep relative URL to render through resolveAssetUrl
-            arr[sectionUploadIndex] = { ...arr[sectionUploadIndex], data: { ...(arr[sectionUploadIndex].data || {}), images: imgs } };
-            return { ...prev, sections: arr };
+        if (sectionUploadIndexRef.current !== null && sectionUploadIndexRef.current !== undefined) {
+          setFormData((prev) => {
+            const sections = [...prev.sections];
+            const idx = sectionUploadIndexRef.current;
+            const images = [...(sections[idx]?.data?.images || [])];
+            images.push({ url, caption: '' });
+            sections[idx] = {
+              ...sections[idx],
+              data: { ...(sections[idx].data || {}), images }
+            };
+            return { ...prev, sections };
           });
-          setSectionUploadIndex(null);
         } else {
-          setFormData(prev => ({ ...prev, images: [...prev.images, { url, caption: '' }] }));
+          setFormData((prev) => ({ ...prev, images: [...prev.images, { url, caption: '' }] }));
         }
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Tải ảnh thất bại');
     } finally {
-      // reset
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      sectionUploadIndexRef.current = null;
     }
   };
 
-  const handleSectionFileChange = async (e) => {
-    const file = e.target.files?.[0];
+  const handleSectionImageChange = async (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
-    const targetIdx = sectionUploadIndexRef.current;
     try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await apiClient.post('/uploads/image', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-      const url = res.data?.data?.url;
-      if (url && (targetIdx || targetIdx === 0)) {
-        setFormData(prev => {
-          const arr = [...prev.sections];
-          const imgs = [...(arr[targetIdx]?.data?.images || [])];
-          imgs.push({ url, caption: '' });
-          arr[targetIdx] = { ...arr[targetIdx], data: { ...(arr[targetIdx].data || {}), images: imgs } };
-          return { ...prev, sections: arr };
+      const url = await uploadImage(file);
+      if (url && (sectionUploadIndexRef.current || sectionUploadIndexRef.current === 0)) {
+        const idx = sectionUploadIndexRef.current;
+        setFormData((prev) => {
+          const sections = [...prev.sections];
+          const images = [...(sections[idx]?.data?.images || [])];
+          images.push({ url, caption: '' });
+          sections[idx] = {
+            ...sections[idx],
+            data: { ...(sections[idx].data || {}), images }
+          };
+          return { ...prev, sections };
         });
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Tải ảnh thất bại');
     } finally {
-      if (sectionFileInputRef.current) sectionFileInputRef.current.value = '';
-      setSectionUploadIndex(null);
+      if (sectionImageInputRef.current) sectionImageInputRef.current.value = '';
       sectionUploadIndexRef.current = null;
     }
   };
 
-  const handleRemoveImage = (index) => {
-    setFormData({ ...formData, images: formData.images.filter((_, i) => i !== index) });
+  const removeCoverImage = (idx) => {
+    setFormData((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, imageIdx) => imageIdx !== idx)
+    }));
+  };
+
+  const addSection = (type) => {
+    setFormData((prev) => ({
+      ...prev,
+      sections: [
+        ...prev.sections,
+        createSectionPayload(type, prev.sections.length)
+      ]
+    }));
+    setActiveTab('sections');
+  };
+
+  const createSectionPayload = (type, orderIndex) => {
+    switch (type) {
+      case 'heading':
+        return { type, title: 'Tiêu đề chương mới', contentHtml: '', orderIndex };
+      case 'text':
+        return { type, title: '', contentHtml: '<p>Nội dung chính...</p>', orderIndex };
+      case 'image_gallery':
+        return { type, title: '', data: { images: [] }, orderIndex };
+      case 'video':
+        return { type, title: '', data: { url: '', description: '' }, orderIndex };
+      case 'divider':
+      default:
+        return { type: 'divider', orderIndex };
+    }
+  };
+
+  const updateSection = (idx, patch) => {
+    setFormData((prev) => {
+      const sections = [...prev.sections];
+      sections[idx] = { ...sections[idx], ...patch };
+      return { ...prev, sections };
+    });
+  };
+
+  const removeSection = (idx) => {
+    setFormData((prev) => {
+      const sections = prev.sections.filter((_, i) => i !== idx).map((section, orderIndex) => ({
+        ...section,
+        orderIndex
+      }));
+      return { ...prev, sections };
+    });
+  };
+
+  const moveSection = (idx, direction) => {
+    setFormData((prev) => {
+      const sections = [...prev.sections];
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= sections.length) return prev;
+      [sections[idx], sections[nextIdx]] = [sections[nextIdx], sections[idx]];
+      return {
+        ...prev,
+        sections: sections.map((section, orderIndex) => ({ ...section, orderIndex }))
+      };
+    });
   };
 
   const handleSave = async () => {
     try {
       setError('');
       if (!formData.title.trim()) {
-        setError('Vui lòng nhập tiêu đề');
+        setError('Vui lòng nhập tiêu đề bài học');
+        setActiveTab('overview');
         return;
       }
+      const payload = {
+        ...formData,
+        sections: formData.sections.map((section, idx) => ({
+          type: section.type,
+          title: section.title ?? null,
+          contentHtml: section.contentHtml ?? section.content_html ?? null,
+          data: section.data ?? {},
+          orderIndex: Number(section.orderIndex ?? idx)
+        }))
+      };
 
+      let savedLesson;
       if (editingLesson) {
-        await lessonService.update(editingLesson.lesson_id, formData);
-        setSuccess('Cập nhật bài học thành công!');
+        const res = await lessonService.update(editingLesson.lesson_id, payload);
+        savedLesson = res.data || res;
+        setSuccess('Cập nhật bài học thành công');
       } else {
-        const created = await lessonService.create(formData);
-        const lesson = created?.data;
-        setSuccess('Tạo bài học thành công!');
-        // Optionally create attached quiz
-        if (createQuiz && lesson?.lesson_id) {
-          // build payload
-          const payload = {
-            title: quizForm.title?.trim() || `Quiz: ${formData.title}`,
-            description: quizForm.description || '',
-            lessonId: lesson.lesson_id,
-            difficulty: quizForm.difficulty,
-            timeLimit: Number(quizForm.timeLimit) || 10,
-            questions: (quizForm.questions || [])
-              .filter(q => (q.questionText || '').trim() && (q.options || []).some(opt => (opt || '').trim()))
-              .map(q => ({
-                questionText: q.questionText,
-                options: (q.options || []).map(o => o || '').filter(o => o.trim() !== ''),
-                correctIndex: Math.max(0, Math.min((q.options || []).length - 1, Number(q.correctIndex) || 0))
-              }))
-          };
-          if (payload.questions.length > 0) {
-            await quizManagementService.create(payload);
-            setSuccess('Tạo bài học và quiz đi kèm thành công!');
-          }
+        const res = await lessonService.create(payload);
+        savedLesson = res.data || res;
+        setSuccess('Tạo bài học thành công');
+      }
+
+      if (!editingLesson && createQuiz && savedLesson?.lesson_id) {
+        const quizPayload = buildQuizPayload(savedLesson.lesson_id);
+        if (quizPayload.questions.length) {
+          await quizManagementService.create(quizPayload);
+          setSuccess('Tạo bài học và bài kiểm tra đi kèm thành công');
         }
       }
 
-      handleClose();
-      loadLessons();
+      await loadLessons();
+      resetComposer();
+      setComposerOpen(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) {
-      setError(e.response?.data?.error || e.message);
+      setError(e.response?.data?.error || e.message || 'Đã xảy ra lỗi khi lưu bài học');
     }
   };
 
-  // Quiz form handlers
-  const updateQuizQuestion = (idx, patch) => {
-    setQuizForm(f => {
-      const next = { ...f, questions: [...f.questions] };
-      next.questions[idx] = { ...next.questions[idx], ...patch };
-      return next;
-    });
-  };
-  const updateQuizOption = (qIdx, optIdx, value) => {
-    setQuizForm(f => {
-      const qs = [...f.questions];
-      const q = { ...qs[qIdx], options: [...qs[qIdx].options] };
-      q.options[optIdx] = value;
-      qs[qIdx] = q;
-      return { ...f, questions: qs };
-    });
-  };
-  const addQuizQuestion = () => {
-    setQuizForm(f => ({ ...f, questions: [...f.questions, { questionText: '', options: ['', '', '', ''], correctIndex: 0 }] }));
-  };
-  const removeQuizQuestion = (idx) => {
-    setQuizForm(f => ({ ...f, questions: f.questions.filter((_, i) => i !== idx) }));
+  const buildQuizPayload = (lessonId) => {
+    const normalized = quizForm.questions
+      .map((question) => {
+        const base = {
+          questionText: question.questionText?.trim(),
+          questionType: question.questionType,
+          points: Number(question.points) > 0 ? Number(question.points) : 1,
+          explanation: question.explanation?.trim() || ''
+        };
+
+        if (!base.questionText) return null;
+
+        if (question.questionType === 'fill_blank') {
+          const acceptedAnswers = (question.acceptedAnswers || [])
+            .map((ans) => (ans || '').trim())
+            .filter(Boolean);
+          if (!acceptedAnswers.length) return null;
+          return {
+            ...base,
+            acceptedAnswers
+          };
+        }
+
+        const answers = (question.answers || [])
+          .map((answer) => ({
+            id: answer.id || uid(),
+            answerText: answer.answerText?.trim() || '',
+            isCorrect: Boolean(answer.isCorrect)
+          }))
+          .filter((answer) => answer.answerText);
+
+        if (answers.length < 2) return null;
+        if (!answers.some((ans) => ans.isCorrect)) {
+          answers[0] = { ...answers[0], isCorrect: true };
+        }
+
+        return {
+          ...base,
+          answers
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      title: quizForm.title?.trim() || `Quiz cho ${formData.title}`,
+      description: quizForm.description || '',
+      difficulty: quizForm.difficulty,
+      timeLimit: Number(quizForm.timeLimit) || 10,
+      assessmentType: quizForm.assessmentType,
+      lessonId,
+      questions: normalized
+    };
   };
 
-  const handleDelete = async (lessonId, lesson) => {
+  const toggleQuizBuilder = (checked) => {
+    setCreateQuiz(checked);
+    if (checked && quizForm.questions.length === 0) {
+      setQuizForm(defaultQuizForm());
+    }
+  };
+
+  const addQuizQuestion = (preferredType) => {
+    setQuizForm((prev) => ({
+      ...prev,
+      questions: [...prev.questions, createQuestionTemplate(preferredType || resolveQuestionType(prev.assessmentType))]
+    }));
+  };
+
+  const resolveQuestionType = (assessmentType) => {
+    if (assessmentType === 'multi_choice') return 'multi_select';
+    if (assessmentType === 'fill_blank') return 'fill_blank';
+    return 'single_choice';
+  };
+
+  const updateQuizQuestion = (idx, patch) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      questions[idx] = { ...questions[idx], ...patch };
+      return { ...prev, questions };
+    });
+  };
+
+  const removeQuizQuestion = (idx) => {
+    setQuizForm((prev) => ({
+      ...prev,
+      questions: prev.questions.filter((_, questionIdx) => questionIdx !== idx)
+    }));
+  };
+
+  const addAnswerOption = (qIdx) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      question.answers = [...(question.answers || []), { id: uid(), answerText: '', isCorrect: false }];
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const updateAnswerOption = (qIdx, ansIdx, patch) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      const answers = [...(question.answers || [])];
+      answers[ansIdx] = { ...answers[ansIdx], ...patch };
+      if (patch.isCorrect && question.questionType === 'single_choice') {
+        answers.forEach((answer, idx) => {
+          if (idx !== ansIdx) answer.isCorrect = false;
+        });
+      }
+      question.answers = answers;
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const removeAnswerOption = (qIdx, ansIdx) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      question.answers = (question.answers || []).filter((_, idx) => idx !== ansIdx);
+      if (question.questionType === 'single_choice' && !question.answers.some((ans) => ans.isCorrect) && question.answers.length) {
+        question.answers[0].isCorrect = true;
+      }
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const updateAcceptedAnswer = (qIdx, idx, value) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      const acceptedAnswers = [...(question.acceptedAnswers || [])];
+      acceptedAnswers[idx] = value;
+      question.acceptedAnswers = acceptedAnswers;
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const addAcceptedAnswer = (qIdx) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      question.acceptedAnswers = [...(question.acceptedAnswers || []), ''];
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const removeAcceptedAnswer = (qIdx, idx) => {
+    setQuizForm((prev) => {
+      const questions = [...prev.questions];
+      const question = { ...questions[qIdx] };
+      question.acceptedAnswers = (question.acceptedAnswers || []).filter((_, i) => i !== idx);
+      questions[qIdx] = question;
+      return { ...prev, questions };
+    });
+  };
+
+  const handleDeleteLesson = async (lesson) => {
     if (!canManageLesson(lesson)) {
       setError('Bạn chỉ có thể xóa bài học do bạn tạo.');
       return;
     }
     if (!window.confirm('Bạn có chắc muốn xóa bài học này?')) return;
     try {
-      await lessonService.delete(lessonId);
-      setSuccess('Xóa bài học thành công!');
-      loadLessons();
-      setTimeout(() => setSuccess(''), 3000);
+      await lessonService.delete(lesson.lesson_id);
+      setSuccess('Đã xóa bài học');
+      await loadLessons();
+      setTimeout(() => setSuccess(''), 2000);
     } catch (e) {
       setError('Không thể xóa: ' + (e.response?.data?.error || e.message));
     }
   };
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const renderStatus = (lesson) => {
+    if (lesson.is_published) {
+      return <Badge variant="success">Đã xuất bản</Badge>;
+    }
+    return <Badge variant="outline">Nháp</Badge>;
+  };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ArticleIcon fontSize="large" color="primary" />
-          Quản lý Bài học
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreate}
-          size="large"
-        >
-          Tạo Bài học mới
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-indigo-500 uppercase tracking-wide">Quản lý nội dung</p>
+          <h1 className="mt-1 text-3xl font-semibold text-slate-900">Bài học &amp; nội dung số</h1>
+          <p className="text-sm text-slate-500">Tạo, chỉnh sửa và xuất bản bài học cùng bài kiểm tra đi kèm.</p>
+        </div>
+        <Button onClick={handleOpenCreate} className="gap-2 rounded-full px-6 shadow-lg shadow-indigo-500/30">
+          <Plus className="h-4 w-4" />
+          Tạo bài học mới
         </Button>
-      </Stack>
+      </div>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>{success}</Alert>}
+      {success && (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      )}
 
-      <TableContainer component={Paper} elevation={2}>
-        <Table>
-          <TableHead>
-            <TableRow sx={{ bgcolor: 'primary.main' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tiêu đề</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tóm tắt</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Trạng thái</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ngày tạo</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Thao tác</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {lessons.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">Chưa có bài học nào</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              lessons.map((lesson) => (
-                <TableRow key={lesson.lesson_id} hover>
-                  <TableCell>{lesson.lesson_id}</TableCell>
-                  <TableCell><strong>{lesson.title}</strong></TableCell>
-                  <TableCell>{lesson.summary || '—'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={lesson.is_published ? 'Đã xuất bản' : 'Nháp'}
-                      color={lesson.is_published ? 'success' : 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{new Date(lesson.created_at).toLocaleDateString('vi-VN')}</TableCell>
-                  <TableCell align="center">
-                    <Tooltip title={canManageLesson(lesson) ? 'Chỉnh sửa' : 'Chỉ chỉnh sửa được bài học do bạn tạo'}>
-                      <span>
-                        <IconButton 
-                          color="primary" 
+      <div className="rounded-3xl border border-slate-100 bg-white shadow-smooth">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm text-slate-600">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
+                <th className="px-6 py-3">Bài học</th>
+                <th className="px-6 py-3">Tóm tắt</th>
+                <th className="px-6 py-3">Trạng thái</th>
+                <th className="px-6 py-3">Ngày tạo</th>
+                <th className="px-6 py-3 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                    <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-slate-300" />
+                    Đang tải danh sách...
+                  </td>
+                </tr>
+              ) : lessons.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
+                    Chưa có bài học nào. Bấm &ldquo;Tạo bài học mới&rdquo; để bắt đầu.
+                  </td>
+                </tr>
+              ) : (
+                lessons.map((lesson) => (
+                  <tr key={lesson.lesson_id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-6 py-4 font-semibold text-slate-900">{lesson.title}</td>
+                    <td className="px-6 py-4 text-slate-500">{lesson.summary || '—'}</td>
+                    <td className="px-6 py-4">{renderStatus(lesson)}</td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {lesson.created_at ? new Date(lesson.created_at).toLocaleDateString('vi-VN') : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full"
                           onClick={() => handleOpenEdit(lesson)}
                           disabled={!canManageLesson(lesson)}
                         >
-                          <EditIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={canManageLesson(lesson) ? 'Xóa' : 'Chỉ xóa được bài học do bạn tạo'}>
-                      <span>
-                        <IconButton 
-                          color="error" 
-                          onClick={() => handleDelete(lesson.lesson_id, lesson)}
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Chỉnh sửa</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                          onClick={() => handleDeleteLesson(lesson)}
                           disabled={!canManageLesson(lesson)}
                         >
-                          <DeleteIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={openDialog} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingLesson ? 'Chỉnh sửa Bài học' : 'Tạo Bài học mới'}
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <TextField
-              label="Tiêu đề"
-              fullWidth
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            />
-            <TextField
-              label="Tóm tắt"
-              fullWidth
-              multiline
-              rows={2}
-              value={formData.summary}
-              onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
-            />
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Giảng viên"
-                  fullWidth
-                  value={formData.instructor}
-                  onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Thời lượng (vd: 25 phút)"
-                  fullWidth
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Độ khó</InputLabel>
-                  <Select
-                    value={formData.difficulty}
-                    label="Độ khó"
-                    onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
-                  >
-                    <MenuItem value="Cơ bản">Cơ bản</MenuItem>
-                    <MenuItem value="Trung bình">Trung bình</MenuItem>
-                    <MenuItem value="Nâng cao">Nâng cao</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Danh mục"
-                  fullWidth
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  placeholder="vd: Lịch sử địa phương"
-                />
-              </Grid>
-            </Grid>
-
-            {/* Tags */}
-            <Box>
-              <Typography variant="subtitle2" mb={1}>Tags</Typography>
-              <Stack direction="row" spacing={1} mb={1} flexWrap="wrap">
-                {formData.tags.map((tag, index) => (
-                  <Chip
-                    key={index}
-                    label={tag}
-                    onDelete={() => handleRemoveTag(tag)}
-                    color="primary"
-                    size="small"
-                    sx={{ mb: 1 }}
-                  />
-                ))}
-              </Stack>
-              <Stack direction="row" spacing={1}>
-                <TextField
-                  size="small"
-                  placeholder="Nhập tag mới..."
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
-                  fullWidth
-                />
-                <Button variant="outlined" onClick={handleAddTag}>Thêm</Button>
-              </Stack>
-            </Box>
-
-            {/* Images */}
-            <Box>
-              <Typography variant="subtitle2" mb={1}>Hình ảnh</Typography>
-              <Stack spacing={2} mb={2}>
-                {formData.images.map((img, index) => (
-                  <Paper key={index} sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box component="img" src={resolveAssetUrl(img.url)} alt={`image-${index}`} sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, border: '1px solid #eee' }} />
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ display:'block' }}>{img.url}</Typography>
-                      <TextField
-                        size="small"
-                        placeholder="Chú thích (tùy chọn)"
-                        value={img.caption || ''}
-                        onChange={(e)=> setFormData(prev => { const arr=[...prev.images]; arr[index] = { ...arr[index], caption: e.target.value }; return { ...prev, images: arr }; })}
-                        fullWidth
-                        sx={{ mt: 1 }}
-                      />
-                    </Box>
-                    <IconButton size="small" color="error" onClick={() => handleRemoveImage(index)}>
-                      <CloseIcon />
-                    </IconButton>
-                  </Paper>
-                ))}
-              </Stack>
-              <Stack spacing={1}>
-                <Button variant="contained" color="secondary" onClick={handlePickImage} sx={{ alignSelf:'flex-start' }}>Chọn từ máy</Button>
-                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
-                <input ref={sectionFileInputRef} type="file" accept="image/*" hidden onChange={handleSectionFileChange} />
-              </Stack>
-            </Box>
-
-            <Box>
-              <Typography variant="subtitle2" mb={1}>Nội dung</Typography>
-              <ReactQuill
-                theme="snow"
-                value={formData.contentHtml}
-                onChange={(content) => setFormData({ ...formData, contentHtml: content })}
-                style={{ height: '300px', marginBottom: '60px' }}
-              />
-            </Box>
-
-            {/* Sections Builder */}
-            <Divider sx={{ my: 2 }} />
-            <Box>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-                <Typography variant="h6">Các mục (Sections)</Typography>
-                <Stack direction="row" spacing={1}>
-                  <Button variant="outlined" size="small" startIcon={<TitleIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'heading', title:'Tiêu đề chương', orderIndex:p.sections.length }] }))}>Tiêu đề</Button>
-                  <Button variant="outlined" size="small" startIcon={<TextIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'text', contentHtml:'<p>Nội dung...</p>', orderIndex:p.sections.length }] }))}>Đoạn văn</Button>
-                  <Button variant="outlined" size="small" startIcon={<ImageIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'image_gallery', data:{ images:[] }, orderIndex:p.sections.length }] }))}>Thư viện ảnh</Button>
-                  <Button variant="outlined" size="small" startIcon={<VideoIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'video', data:{ url:'' }, orderIndex:p.sections.length }] }))}>Video</Button>
-                  <Button variant="outlined" size="small" startIcon={<DividerIcon />} onClick={() => setFormData(p=>({ ...p, sections:[...p.sections, { type:'divider', orderIndex:p.sections.length }] }))}>Ngăn cách</Button>
-                </Stack>
-              </Stack>
-
-              {formData.sections.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">Chưa có mục nào. Hãy thêm mục để cấu trúc bài học theo chương/phần.</Typography>
-              ) : (
-                <Stack spacing={2}>
-                  {formData.sections.map((s, idx) => (
-                    <Paper key={idx} variant="outlined" sx={{ p:2 }}>
-                      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                        <Typography fontWeight={600}>#{idx+1} · {s.type}</Typography>
-                        <Stack direction="row" spacing={1}>
-                          <IconButton size="small" disabled={idx===0} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; return { ...p, sections: arr.map((x,i)=> ({ ...x, orderIndex:i })) }; })}><ArrowUpIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" disabled={idx===formData.sections.length-1} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; return { ...p, sections: arr.map((x,i)=> ({ ...x, orderIndex:i })) }; })}><ArrowDownIcon fontSize="small" /></IconButton>
-                          <IconButton size="small" color="error" onClick={()=> setFormData(p=> ({ ...p, sections: p.sections.filter((_,i)=> i!==idx).map((x,i)=> ({ ...x, orderIndex:i })) }))}><CloseIcon fontSize="small" /></IconButton>
-                        </Stack>
-                      </Stack>
-
-                      {s.type === 'heading' && (
-                        <Stack spacing={1}>
-                          <TextField fullWidth label="Tiêu đề" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
-                          <Typography variant="caption" color="text.secondary">Nội dung ngắn bên dưới tiêu đề (tuỳ chọn)</Typography>
-                          <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 140 }} />
-                          <Box sx={{ height: 8 }} />
-                        </Stack>
-                      )}
-
-                      {s.type === 'text' && (
-                        <Box>
-                          <TextField fullWidth label="Tiêu đề mục (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} sx={{ mb:1 }} />
-                          <ReactQuill theme="snow" value={s.contentHtml||''} onChange={(val)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], contentHtml:val }; return { ...p, sections:arr }; })} style={{ height: 180 }} />
-                          <Box sx={{ height: 12 }} />
-                        </Box>
-                      )}
-
-                      {s.type === 'image_gallery' && (
-                        <Box>
-                          <TextField fullWidth label="Tiêu đề thư viện (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} sx={{ mb:1 }} />
-                          <Typography variant="body2" color="text.secondary" sx={{ mb:1 }}>Thêm ảnh cho thư viện</Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap">
-                            {(s.data?.images||[]).map((img, ii) => (
-                              <Box key={ii} sx={{ position:'relative', mr:1, mb:1 }}>
-                                <Box component="img" src={resolveAssetUrl(img.url)} sx={{ width:120, height:80, objectFit:'cover', borderRadius:1, border:'1px solid #eee' }} />
-                                <IconButton size="small" color="error" sx={{ position:'absolute', top:0, right:0 }} onClick={()=> setFormData(p=>{ const arr=[...p.sections]; const imgs=[...(arr[idx].data?.images||[])]; imgs.splice(ii,1); arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), images: imgs } }; return { ...p, sections:arr }; })}><CloseIcon fontSize="small" /></IconButton>
-                                <TextField size="small" placeholder="Chú thích" value={img.caption||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; const imgs=[...(arr[idx].data?.images||[])]; imgs[ii] = { ...imgs[ii], caption: e.target.value }; arr[idx] = { ...arr[idx], data: { ...(arr[idx].data||{}), images: imgs } }; return { ...p, sections: arr }; })} sx={{ mt:0.5, width:120 }} />
-                              </Box>
-                            ))}
-                          </Stack>
-                          <Button variant="outlined" size="small" onClick={()=> handlePickSectionImage(idx)}>Thêm ảnh</Button>
-                        </Box>
-                      )}
-
-                      {s.type === 'video' && (
-                        <Stack spacing={1}>
-                          <TextField fullWidth label="Tiêu đề video (tuỳ chọn)" value={s.title||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], title:e.target.value }; return { ...p, sections:arr }; })} />
-                          <TextField fullWidth label="Link video (YouTube/Vimeo/mp4)" value={s.data?.url||''} onChange={(e)=> setFormData(p=>{ const arr=[...p.sections]; arr[idx]={ ...arr[idx], data:{ ...(arr[idx].data||{}), url:e.target.value } }; return { ...p, sections:arr }; })} />
-                        </Stack>
-                      )}
-                    </Paper>
-                  ))}
-                </Stack>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Xóa</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
-            </Box>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={formData.isPublished}
-                  onChange={(e) => setFormData({ ...formData, isPublished: e.target.checked })}
-                />
-              }
-              label="Xuất bản ngay"
-            />
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-            {editingLesson && (
-              <Box>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle1" gutterBottom>Quiz liên quan</Typography>
-                {attachedQuizzes.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">Chưa có quiz gắn với bài học này.</Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    {attachedQuizzes.map(q => (
-                      <Paper key={q.quiz_id} sx={{ p:1.5, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <Box>
-                          <Typography fontWeight={600}>{q.title}</Typography>
-                          <Typography variant="caption" color="text.secondary">ID: {q.quiz_id} • Thời lượng: {q.time_limit || 0} phút • {q.difficulty || '—'}</Typography>
-                        </Box>
-                        <Button size="small" variant="outlined" onClick={()=> window.open('/admin/quizzes', '_blank')}>Quản lý Quiz</Button>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
-              </Box>
+      <Sheet open={composerOpen} onOpenChange={handleCloseComposer}>
+        <SheetContent side="right" className="sm:max-w-5xl">
+          <SheetHeader>
+            <SheetTitle>{editingLesson ? 'Chỉnh sửa bài học' : 'Tạo bài học mới'}</SheetTitle>
+            <SheetDescription>
+              Thiết kế cấu trúc bài học, thêm nội dung từng phần và tùy chọn gắn bài kiểm tra với 3 dạng câu hỏi phổ biến.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-6">
+            {(listRefreshing || loading) && editingLesson && (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                Đang đồng bộ dữ liệu bài học...
+              </div>
             )}
 
-            {/* Attached Quiz Section */}
-            <Divider sx={{ my: 2 }} />
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography variant="h6">Tạo quiz đi kèm (tùy chọn)</Typography>
-              <FormControlLabel
-                control={<Switch checked={createQuiz} onChange={(e)=> setCreateQuiz(e.target.checked)} />}
-                label={createQuiz ? 'Có' : 'Không'}
-              />
-            </Stack>
-            {createQuiz && (
-              <Box sx={{ p:2, border: '1px solid #eee', borderRadius: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Tiêu đề Quiz"
-                      fullWidth
-                      value={quizForm.title}
-                      onChange={(e)=> setQuizForm({ ...quizForm, title: e.target.value })}
-                      placeholder={`Quiz: ${formData.title}`}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Thời lượng (phút)"
-                      fullWidth
-                      type="number"
-                      value={quizForm.timeLimit}
-                      onChange={(e)=> setQuizForm({ ...quizForm, timeLimit: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Mô tả Quiz"
-                      fullWidth
-                      multiline
-                      minRows={2}
-                      value={quizForm.description}
-                      onChange={(e)=> setQuizForm({ ...quizForm, description: e.target.value })}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Độ khó</InputLabel>
-                      <Select
-                        value={quizForm.difficulty}
-                        label="Độ khó"
-                        onChange={(e)=> setQuizForm({ ...quizForm, difficulty: e.target.value })}
-                      >
-                        <MenuItem value="Cơ bản">Cơ bản</MenuItem>
-                        <MenuItem value="Trung bình">Trung bình</MenuItem>
-                        <MenuItem value="Nâng cao">Nâng cao</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full justify-between gap-2 rounded-3xl bg-slate-100 p-1">
+                <TabsTrigger value="overview" className="flex-1">Tổng quan</TabsTrigger>
+                <TabsTrigger value="sections" className="flex-1">Nội dung</TabsTrigger>
+                <TabsTrigger value="quiz" className="flex-1">Quiz đi kèm</TabsTrigger>
+              </TabsList>
 
-                <Typography variant="subtitle1" sx={{ mt:2, mb:1 }}>Câu hỏi</Typography>
-                <Stack spacing={2}>
-                  {quizForm.questions.map((q, qi) => (
-                    <Paper key={qi} variant="outlined" sx={{ p:2 }}>
-                      <Stack spacing={1}>
-                        <TextField
-                          label={`Câu hỏi ${qi+1}`}
-                          fullWidth
-                          value={q.questionText}
-                          onChange={(e)=> updateQuizQuestion(qi, { questionText: e.target.value })}
+              <TabsContent value="overview">
+                <div className="space-y-6">
+                  <Card className="shadow-none border-slate-100">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Layers3 className="h-5 w-5 text-indigo-500" />
+                        Thông tin chính
+                      </CardTitle>
+                      <CardDescription>Tên bài học, mô tả ngắn và thông tin mô tả.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Tiêu đề *</Label>
+                        <Input value={formData.title} onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))} placeholder="Tên bài học" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tóm tắt</Label>
+                        <Textarea
+                          rows={3}
+                          value={formData.summary}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, summary: e.target.value }))}
+                          placeholder="Mô tả ngắn gọn để hiện ngoài danh sách bài học..."
                         />
-                        <Grid container spacing={1}>
-                          {q.options.map((opt, oi) => (
-                            <Grid item xs={12} sm={6} key={oi}>
-                              <TextField
-                                size="small"
-                                label={`Đáp án ${oi+1}`}
-                                fullWidth
-                                value={opt}
-                                onChange={(e)=> updateQuizOption(qi, oi, e.target.value)}
-                              />
-                            </Grid>
-                          ))}
-                        </Grid>
-                        <FormControl fullWidth size="small" sx={{ mt:1 }}>
-                          <InputLabel>Đáp án đúng</InputLabel>
-                          <Select
-                            value={q.correctIndex}
-                            label="Đáp án đúng"
-                            onChange={(e)=> updateQuizQuestion(qi, { correctIndex: Number(e.target.value) })}
-                          >
-                            {q.options.map((_, oi) => (
-                              <MenuItem key={oi} value={oi}>{`Đáp án ${oi+1}`}</MenuItem>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Giảng viên / Nhóm biên soạn</Label>
+                          <Input value={formData.instructor} onChange={(e) => setFormData((prev) => ({ ...prev, instructor: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Thời lượng dự kiến</Label>
+                          <Input value={formData.duration} onChange={(e) => setFormData((prev) => ({ ...prev, duration: e.target.value }))} placeholder="Ví dụ: 25 phút" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Độ khó</Label>
+                          <div className="flex gap-2">
+                            {DIFFICULTY_OPTIONS.map((difficulty) => (
+                              <button
+                                key={difficulty}
+                                type="button"
+                                onClick={() => setFormData((prev) => ({ ...prev, difficulty }))}
+                                className={cn(
+                                  'flex-1 rounded-2xl border px-3 py-2 text-sm font-medium transition',
+                                  formData.difficulty === difficulty
+                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
+                                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                )}
+                              >
+                                {difficulty}
+                              </button>
                             ))}
-                          </Select>
-                        </FormControl>
-                        <Stack direction="row" spacing={1} justifyContent="space-between" sx={{ mt:1 }}>
-                          <Button color="error" onClick={()=> removeQuizQuestion(qi)} disabled={quizForm.questions.length <= 1}>Xóa câu hỏi</Button>
-                          <Button onClick={addQuizQuestion}>Thêm câu hỏi</Button>
-                        </Stack>
-                      </Stack>
-                    </Paper>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Hủy</Button>
-          <Button variant="contained" onClick={handleSave}>
-            {editingLesson ? 'Cập nhật' : 'Tạo mới'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Danh mục</Label>
+                          <Input value={formData.category} onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))} placeholder="Ví dụ: Lịch sử địa phương" />
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <Label>Tags</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                            placeholder="Nhập tag và nhấn Enter"
+                          />
+                          <Button type="button" variant="secondary" onClick={handleAddTag}>
+                            <Tag className="mr-2 h-4 w-4" />
+                            Thêm
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {formData.tags.map((tag) => (
+                            <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                              #{tag}
+                              <button className="text-slate-400 hover:text-rose-500" onClick={() => handleRemoveTag(tag)}>
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                          {formData.tags.length === 0 && <p className="text-sm text-slate-400">Chưa có tag nào</p>}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-      {/* Inline Quiz Builder inside Dialog Content (inserted above actions) */}
-    </Container>
+                  <Card className="shadow-none border-slate-100">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <ImageIcon className="h-5 w-5 text-pink-500" />
+                        Hình ảnh minh họa
+                      </CardTitle>
+                      <CardDescription>Ảnh bìa và thư viện dùng để giới thiệu bài học.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={coverInputRef}
+                          onChange={handleCoverChange}
+                          className="hidden"
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={sectionImageInputRef}
+                          onChange={handleSectionImageChange}
+                          className="hidden"
+                        />
+                        <p className="text-sm text-slate-500">Kéo thả hoặc chọn hình ảnh để tải lên.</p>
+                        <Button variant="secondary" className="mt-3" type="button" onClick={handleCoverSelect}>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Chọn hình
+                        </Button>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {formData.images.map((img, idx) => (
+                          <div key={img.url || idx} className="group relative rounded-2xl border border-slate-200 p-3">
+                            <img
+                              src={resolveAssetUrl(img.url)}
+                              alt={img.caption || `Ảnh ${idx + 1}`}
+                              className="h-40 w-full rounded-xl object-cover"
+                            />
+                            <button
+                              className="absolute right-4 top-4 rounded-full bg-white/90 p-1 text-rose-500 opacity-0 shadow group-hover:opacity-100"
+                              onClick={() => removeCoverImage(idx)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <Input
+                              className="mt-3 text-sm"
+                              placeholder="Chú thích ảnh"
+                              value={img.caption || ''}
+                              onChange={(e) =>
+                                setFormData((prev) => {
+                                  const images = [...prev.images];
+                                  images[idx] = { ...images[idx], caption: e.target.value };
+                                  return { ...prev, images };
+                                })
+                              }
+                            />
+                          </div>
+                        ))}
+                        {formData.images.length === 0 && (
+                          <div className="rounded-2xl border border-slate-200 p-4 text-center text-sm text-slate-400">
+                            Chưa có hình ảnh nào.
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="shadow-none border-slate-100">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Sparkles className="h-5 w-5 text-emerald-500" />
+                        Xuất bản
+                      </CardTitle>
+                      <CardDescription>Chọn trạng thái hiển thị của bài học ngay sau khi lưu.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Xuất bản ngay</p>
+                          <p className="text-xs text-slate-500">Bài học sẽ hiển thị cho học viên sau khi lưu.</p>
+                        </div>
+                        <Switch checked={formData.isPublished} onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isPublished: checked }))} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="sections">
+                <div className="space-y-6">
+                  <Card className="shadow-none border-slate-100">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <BookOpenCheck className="h-5 w-5 text-teal-500" />
+                        Thêm mục nội dung
+                      </CardTitle>
+                      <CardDescription>Kết hợp nhiều loại mục để cấu trúc bài học sinh động.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2">
+                      {SECTION_PRESETS.map((preset) => (
+                        <button
+                          key={preset.type}
+                          type="button"
+                          onClick={() => addSection(preset.type)}
+                          className={cn(
+                            'rounded-2xl border border-slate-200 p-4 text-left transition hover:border-transparent hover:shadow-lg',
+                            'bg-gradient-to-br from-white to-slate-50'
+                          )}
+                        >
+                          <p className="text-sm font-semibold text-slate-800">{preset.label}</p>
+                          <p className="mt-1 text-xs text-slate-500">{preset.description}</p>
+                        </button>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <ScrollArea className="max-h-[60vh] rounded-3xl border border-slate-100">
+                    <div className="divide-y divide-slate-100">
+                      {formData.sections.length === 0 && (
+                        <div className="p-8 text-center text-sm text-slate-400">
+                          Chưa có nội dung nào. Hãy chọn loại mục phía trên để bắt đầu biên soạn.
+                        </div>
+                      )}
+                      {formData.sections.map((section, idx) => (
+                        <div key={section.section_id || idx} className="flex gap-6 px-6 py-6">
+                          <div className="flex flex-col items-center gap-2 text-slate-300">
+                            <GripVertical className="h-4 w-4" />
+                            <button disabled={idx === 0} onClick={() => moveSection(idx, -1)} className="rounded-full border border-slate-200 p-1 disabled:opacity-40">
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button disabled={idx === formData.sections.length - 1} onClick={() => moveSection(idx, 1)} className="rounded-full border border-slate-200 p-1 disabled:opacity-40">
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="flex-1 rounded-2xl border border-slate-200 p-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-slate-400">Mục {idx + 1}</p>
+                                <p className="font-semibold text-slate-800">
+                                  {SECTION_PRESETS.find((p) => p.type === section.type)?.label || section.type}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button className="rounded-full border border-slate-200 p-2 text-rose-500" onClick={() => removeSection(idx)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-4 space-y-4">
+                              {section.type === 'heading' && (
+                                <>
+                                  <Input
+                                    value={section.title || ''}
+                                    onChange={(e) => updateSection(idx, { title: e.target.value })}
+                                    placeholder="Tiêu đề mục"
+                                  />
+                                  <Textarea
+                                    rows={3}
+                                    value={section.contentHtml || ''}
+                                    onChange={(e) => updateSection(idx, { contentHtml: e.target.value })}
+                                    placeholder="Lời dẫn (tuỳ chọn)"
+                                  />
+                                </>
+                              )}
+
+                              {section.type === 'text' && (
+                                <>
+                                  <Input
+                                    value={section.title || ''}
+                                    onChange={(e) => updateSection(idx, { title: e.target.value })}
+                                    placeholder="Tiêu đề nhỏ (tuỳ chọn)"
+                                  />
+                                  <ReactQuill
+                                    theme="snow"
+                                    value={section.contentHtml || ''}
+                                    onChange={(value) => updateSection(idx, { contentHtml: value })}
+                                  />
+                                </>
+                              )}
+
+                              {section.type === 'image_gallery' && (
+                                <>
+                                  <Input
+                                    value={section.title || ''}
+                                    onChange={(e) => updateSection(idx, { title: e.target.value })}
+                                    placeholder="Tiêu đề thư mục ảnh (tuỳ chọn)"
+                                  />
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    {(section.data?.images || []).map((img, imageIdx) => (
+                                      <div key={img.url || imageIdx} className="relative rounded-2xl border border-slate-200 p-3">
+                                        <img
+                                          src={resolveAssetUrl(img.url)}
+                                          alt={img.caption || `Ảnh ${imageIdx + 1}`}
+                                          className="h-32 w-full rounded-xl object-cover"
+                                        />
+                                        <button
+                                          className="absolute right-4 top-4 rounded-full bg-white/90 p-1 text-rose-500"
+                                          onClick={() =>
+                                            updateSection(idx, {
+                                              data: {
+                                                ...(section.data || {}),
+                                                images: section.data.images.filter((_, i) => i !== imageIdx)
+                                              }
+                                            })
+                                          }
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                        <Input
+                                          className="mt-2 text-xs"
+                                          value={img.caption || ''}
+                                          placeholder="Chú thích"
+                                          onChange={(e) => {
+                                            const images = [...(section.data?.images || [])];
+                                            images[imageIdx] = { ...images[imageIdx], caption: e.target.value };
+                                            updateSection(idx, { data: { ...(section.data || {}), images } });
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSectionImageSelect(idx)}
+                                      className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm text-slate-400"
+                                    >
+                                      + Thêm ảnh
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+
+                              {section.type === 'video' && (
+                                <>
+                                  <Input
+                                    value={section.title || ''}
+                                    onChange={(e) => updateSection(idx, { title: e.target.value })}
+                                    placeholder="Tiêu đề video (tuỳ chọn)"
+                                  />
+                                  <Input
+                                    value={section.data?.url || ''}
+                                    onChange={(e) => updateSection(idx, { data: { ...(section.data || {}), url: e.target.value } })}
+                                    placeholder="Link YouTube/Vimeo/mp4"
+                                  />
+                                  <Textarea
+                                    rows={3}
+                                    value={section.data?.description || ''}
+                                    onChange={(e) => updateSection(idx, { data: { ...(section.data || {}), description: e.target.value } })}
+                                    placeholder="Mô tả ngắn"
+                                  />
+                                </>
+                              )}
+
+                              {section.type === 'divider' && (
+                                <div className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-400">
+                                  <Minus className="h-4 w-4" />
+                                  Đường phân cách
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="quiz">
+                <div className="space-y-6">
+                  <Card className="shadow-none border-slate-100">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Layers3 className="h-5 w-5 text-indigo-500" />
+                            Bật quiz đi kèm
+                          </CardTitle>
+                          <CardDescription>Thiết kế bài kiểm tra đi kèm với 3 loại câu hỏi phổ biến.</CardDescription>
+                        </div>
+                        <Switch checked={createQuiz} onCheckedChange={toggleQuizBuilder} />
+                      </div>
+                    </CardHeader>
+                    {createQuiz && (
+                      <CardContent className="space-y-6">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Tên quiz</Label>
+                            <Input
+                              value={quizForm.title}
+                              onChange={(e) => setQuizForm((prev) => ({ ...prev, title: e.target.value }))}
+                              placeholder="Ví dụ: Ôn tập nhanh"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Thời gian làm (phút)</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={quizForm.timeLimit}
+                              onChange={(e) => setQuizForm((prev) => ({ ...prev, timeLimit: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Độ khó</Label>
+                            <Input
+                              value={quizForm.difficulty}
+                              onChange={(e) => setQuizForm((prev) => ({ ...prev, difficulty: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Kiểu bài kiểm tra</Label>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {ASSESSMENT_TYPES.map((type) => (
+                                <button
+                                  key={type.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setQuizForm((prev) => ({
+                                      ...prev,
+                                      assessmentType: type.value,
+                                      questions: prev.questions.length ? prev.questions : [createQuestionTemplate(resolveQuestionType(type.value))]
+                                    }));
+                                  }}
+                                  className={cn(
+                                    'rounded-2xl border px-3 py-3 text-left text-sm',
+                                    quizForm.assessmentType === type.value
+                                      ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                  )}
+                                >
+                                  <p className="font-semibold">{type.label}</p>
+                                  <p className="text-xs text-slate-400">{type.description}</p>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Mô tả</Label>
+                          <Textarea
+                            rows={3}
+                            value={quizForm.description}
+                            onChange={(e) => setQuizForm((prev) => ({ ...prev, description: e.target.value }))}
+                          />
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+
+                  {createQuiz && (
+                    <div className="space-y-4">
+                      {quizForm.questions.map((question, idx) => (
+                        <Card key={question.id} className="shadow-none border-slate-100">
+                          <CardHeader className="pb-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                  Câu hỏi {idx + 1}
+                                  <Badge variant="secondary">{QUESTION_TYPE_OPTIONS.find((item) => item.value === question.questionType)?.label}</Badge>
+                                </CardTitle>
+                                <CardDescription>
+                                  {QUESTION_TYPE_OPTIONS.find((item) => item.value === question.questionType)?.hint}
+                                </CardDescription>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => removeQuizQuestion(idx)} className="text-rose-500 hover:bg-rose-50">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {QUESTION_TYPE_OPTIONS.map((option) => (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() =>
+                                    updateQuizQuestion(idx, {
+                                      questionType: option.value,
+                                      answers: option.value === 'fill_blank'
+                                        ? []
+                                        : (question.answers?.length ? question.answers : createQuestionTemplate(option.value).answers),
+                                      acceptedAnswers: option.value === 'fill_blank' ? (question.acceptedAnswers?.length ? question.acceptedAnswers : ['']) : []
+                                    })
+                                  }
+                                  className={cn(
+                                    'rounded-full border px-3 py-1 text-xs font-medium',
+                                    question.questionType === option.value
+                                      ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                                      : 'border-slate-200 text-slate-500'
+                                  )}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Nội dung câu hỏi</Label>
+                              <Textarea
+                                rows={3}
+                                value={question.questionText}
+                                onChange={(e) => updateQuizQuestion(idx, { questionText: e.target.value })}
+                              />
+                            </div>
+                            {question.questionType === 'fill_blank' ? (
+                              <div className="space-y-3">
+                                <Label>Các đáp án được chấp nhận</Label>
+                                {(question.acceptedAnswers || []).map((answer, answerIdx) => (
+                                  <div key={`${question.id}-${answerIdx}`} className="flex items-center gap-2">
+                                    <Input
+                                      value={answer}
+                                      onChange={(e) => updateAcceptedAnswer(idx, answerIdx, e.target.value)}
+                                      placeholder={`Đáp án ${answerIdx + 1}`}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="text-rose-500 hover:bg-rose-50"
+                                      onClick={() => removeAcceptedAnswer(idx, answerIdx)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button type="button" variant="secondary" size="sm" onClick={() => addAcceptedAnswer(idx)} className="rounded-full">
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Thêm đáp án
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <Label>Đáp án</Label>
+                                {(question.answers || []).map((answer, answerIdx) => (
+                                  <div key={answer.id} className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        updateAnswerOption(idx, answerIdx, { isCorrect: !answer.isCorrect })
+                                      }
+                                      className={cn(
+                                        'h-5 w-5 rounded-full border',
+                                        question.questionType === 'multi_select'
+                                          ? 'rounded-lg'
+                                          : 'rounded-full',
+                                        answer.isCorrect ? 'border-emerald-500 bg-emerald-50 text-emerald-500' : 'border-slate-300'
+                                      )}
+                                    >
+                                      {answer.isCorrect && <CheckCircle2 className="h-4 w-4" />}
+                                    </button>
+                                    <Input
+                                      value={answer.answerText}
+                                      onChange={(e) => updateAnswerOption(idx, answerIdx, { answerText: e.target.value })}
+                                      placeholder={`Đáp án ${answerIdx + 1}`}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeAnswerOption(idx, answerIdx)}
+                                      className="text-rose-500 hover:bg-rose-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button type="button" variant="secondary" size="sm" onClick={() => addAnswerOption(idx)} className="rounded-full">
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Thêm đáp án
+                                </Button>
+                              </div>
+                            )}
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Điểm</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={question.points}
+                                  onChange={(e) => updateQuizQuestion(idx, { points: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Giải thích (tuỳ chọn)</Label>
+                                <Textarea
+                                  rows={2}
+                                  value={question.explanation || ''}
+                                  onChange={(e) => updateQuizQuestion(idx, { explanation: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      <Button type="button" variant="secondary" className="w-full rounded-2xl border border-dashed border-slate-300 py-6 text-slate-500" onClick={() => addQuizQuestion()}>
+                        <Plus className="mr-2 h-5 w-5" />
+                        Thêm câu hỏi mới
+                      </Button>
+                    </div>
+                  )}
+
+                  {editingLesson && attachedQuizzes.length > 0 && (
+                    <Card className="shadow-none border-slate-100">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Calendar className="h-5 w-5 text-indigo-500" />
+                          Quiz đã gắn với bài học
+                        </CardTitle>
+                        <CardDescription>Danh sách bài kiểm tra hiện có liên kết với bài học này.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {attachedQuizzes.map((quiz) => (
+                          <div key={quiz.quiz_id} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
+                            <div>
+                              <p className="font-semibold text-slate-800">{quiz.title}</p>
+                              <p className="text-xs text-slate-400">{quiz.question_count || 0} câu hỏi • {quiz.assessment_type}</p>
+                            </div>
+                            <Badge variant="secondary">#{quiz.quiz_id}</Badge>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <SheetFooter className="mt-6">
+            <Button variant="ghost" className="rounded-full" onClick={() => handleCloseComposer(false)}>
+              Huỷ
+            </Button>
+            <Button className="rounded-full px-6" onClick={handleSave}>
+              {editingLesson ? 'Lưu thay đổi' : 'Tạo bài học'}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 };
 
