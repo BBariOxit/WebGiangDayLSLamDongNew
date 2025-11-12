@@ -18,25 +18,37 @@ const ASSESSMENT_TYPES = [
     value: 'mixed',
     label: 'Kiểu hỗn hợp',
     description: 'Kết hợp linh hoạt nhiều dạng câu hỏi trong cùng một bài kiểm tra.',
-    accent: 'from-fuchsia-500 to-violet-500'
+    icon: Sparkles,
+    accentColor: '#c026d3',
+    accentBg: 'rgba(192, 38, 211, 0.12)',
+    accentBorder: 'rgba(192, 38, 211, 0.35)'
   },
   {
     value: 'quiz',
     label: 'Trắc nghiệm 1 đáp án',
     description: 'Mỗi câu hỏi chỉ có duy nhất một đáp án đúng.',
-    accent: 'from-indigo-500 to-blue-500'
+    icon: CircleDot,
+    accentColor: '#2563eb',
+    accentBg: 'rgba(37, 99, 235, 0.12)',
+    accentBorder: 'rgba(37, 99, 235, 0.35)'
   },
   {
     value: 'multi_choice',
     label: 'Trắc nghiệm nhiều đáp án',
     description: 'Cho phép chọn nhiều đáp án đúng với dạng checkbox.',
-    accent: 'from-orange-500 to-rose-500'
+    icon: ListChecks,
+    accentColor: '#f97316',
+    accentBg: 'rgba(249, 115, 22, 0.12)',
+    accentBorder: 'rgba(249, 115, 22, 0.35)'
   },
   {
     value: 'fill_blank',
     label: 'Điền vào chỗ trống',
     description: 'Học sinh tự nhập đáp án, hỗ trợ nhiều cách viết đúng.',
-    accent: 'from-emerald-500 to-teal-500'
+    icon: Type,
+    accentColor: '#059669',
+    accentBg: 'rgba(5, 150, 105, 0.12)',
+    accentBorder: 'rgba(5, 150, 105, 0.35)'
   }
 ];
 
@@ -698,27 +710,39 @@ const AdminCreateQuiz = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
-                {ASSESSMENT_TYPES.map((type) => (
-                  <button
-                    type="button"
-                    key={type.value}
-                    onClick={() => handleAssessmentChange(type.value)}
-                    className={cn(
-                      'rounded-3xl border p-4 text-left transition hover:-translate-y-0.5',
+                {ASSESSMENT_TYPES.map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <button
+                      type="button"
+                      key={type.value}
+                      onClick={() => handleAssessmentChange(type.value)}
+                      className={cn(
+                        'rounded-3xl border p-4 text-left transition hover:-translate-y-0.5',
                       form.assessmentType === type.value
                         ? 'border-slate-900 bg-white shadow-lg'
                         : 'border-slate-200 bg-white'
                     )}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-base font-semibold text-slate-900">{type.label}</p>
-                        <p className="mt-1 text-sm text-slate-500">{type.description}</p>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-base font-semibold text-slate-900">{type.label}</p>
+                          <p className="mt-1 text-sm text-slate-500">{type.description}</p>
+                        </div>
+                        <div
+                          className="flex h-11 w-11 items-center justify-center rounded-2xl border"
+                          style={{
+                            backgroundColor: type.accentBg,
+                            color: type.accentColor,
+                            borderColor: type.accentBorder,
+                          }}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
                       </div>
-                      <div className={cn('h-10 w-10 rounded-2xl bg-gradient-to-r text-white shadow-md', type.accent)} />
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
 

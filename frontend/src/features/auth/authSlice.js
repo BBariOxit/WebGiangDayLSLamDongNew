@@ -85,6 +85,7 @@ const authSlice = createSlice({
           state.user = action.payload.user;
           state.accessToken = action.payload.accessToken;
           state.refreshToken = action.payload.refreshToken;
+          persist(state);
         }
       });
   }

@@ -20,10 +20,19 @@ const forceLogout = () => {
   }
 };
 
+const getAccessToken = () => {
+  try {
+    const stateToken = store.getState().auth?.accessToken;
+    return stateToken || localStorage.getItem('authToken');
+  } catch {
+    return localStorage.getItem('authToken');
+  }
+};
+
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
