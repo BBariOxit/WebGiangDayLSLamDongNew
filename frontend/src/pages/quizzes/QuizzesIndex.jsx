@@ -146,75 +146,78 @@ const QuizzesIndex = () => {
     const questions = Array.isArray(quiz.questions)
       ? quiz.questions.length
       : quiz.question_count || quiz.question_total || 0;
+    const lessonTitle = quiz.lesson_title || quiz.lessonTitle || quiz.lesson?.title || '';
+    const statusLabel = quiz.status || 'Sẵn sàng';
+    const statusColor =
+      statusLabel === 'Sẵn sàng'
+        ? 'bg-emerald-400'
+        : statusLabel === 'Bảo trì'
+        ? 'bg-amber-400'
+        : 'bg-slate-300';
+    const description = (quiz.description || '').trim();
+    const hasDescription = Boolean(description);
 
     return (
       <Card
         key={quiz.quiz_id ?? quiz.id ?? idx}
-        className="group flex h-full flex-col border-0 bg-white/90 shadow-smooth transition hover:-translate-y-1 hover:shadow-xl"
+        className="group flex min-h-[220px] cursor-pointer flex-col rounded-3xl border border-slate-100 bg-white/95 shadow-smooth transition hover:-translate-y-1 hover:shadow-xl"
         onClick={() => handleOpenQuiz(quiz)}
       >
-        <CardHeader className="flex flex-row items-start gap-4">
-          <div className={cn('rounded-2xl bg-gradient-to-br p-3 text-white shadow-lg', gradient)}>
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <div className="space-y-1">
-            <CardTitle className="font-heading text-xl text-slate-900">
-              {quiz.title || 'Quiz không tên'}
-            </CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
-              {quiz.category && <Badge variant="secondary">{quiz.category}</Badge>}
-              <Badge variant="outline" className="border-dashed">
-                {quiz.difficulty || 'Chưa rõ'}
-              </Badge>
+        <CardContent className="flex flex-1 flex-col gap-3 p-5">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-lg',
+                gradient
+              )}
+            >
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="space-y-1 text-left">
+              <p className="text-base font-semibold text-slate-900 line-clamp-2">{quiz.title || 'Bài kiểm tra'}</p>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {quiz.category && (
+                  <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-600">
+                    {quiz.category}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="rounded-full border-dashed text-slate-500">
+                  {quiz.difficulty || 'Chưa rõ'}
+                </Badge>
+              </div>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col gap-4">
-          {quiz.description && (
-            <CardDescription
-              className="text-base leading-relaxed text-slate-600"
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {quiz.description}
-            </CardDescription>
-          )}
 
-          <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
-            <MiniStat icon={<Timer className="h-4 w-4" />} label="Thời lượng" value={`${quiz.time_limit || 0} phút`} />
+          <div className="min-h-[22px] text-left">
+            {hasDescription ? (
+              <p className="text-sm text-slate-600 line-clamp-1">{description}</p>
+            ) : (
+              <span className="text-sm text-transparent">placeholder</span>
+            )}
+          </div>
+
+          <div className="mt-1 grid grid-cols-3 gap-2 text-sm text-slate-600">
+            <MiniStat icon={<Timer className="h-4 w-4" />} label="Thời lượng" value={`${quiz.time_limit || 0}′`} />
             <MiniStat
               icon={<BookOpenCheck className="h-4 w-4" />}
               label="Câu hỏi"
               value={`${questions || 0} câu`}
             />
-            <MiniStat icon={<Layers3 className="h-4 w-4" />} label="Chủ đề" value={quiz.category || 'Đang cập nhật'} />
+            <MiniStat
+              icon={<Layers3 className="h-4 w-4" />}
+              label="Bài học"
+              value={lessonTitle ? truncateText(lessonTitle, 60) : 'Đang cập nhật'}
+            />
           </div>
 
-          {(quiz.lesson_title || quiz.creator_name) && (
-            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
-              {quiz.lesson_title && (
-                <span className="font-medium text-slate-600">Bài học: {quiz.lesson_title}</span>
-              )}
-              {quiz.creator_name && (
-                <span className="rounded-full bg-white/70 px-3 py-1 font-medium text-slate-600">
-                  {quiz.creator_name}
-                </span>
-              )}
-            </div>
-          )}
-
-          <div className="mt-auto flex items-center justify-between pt-2">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Sẵn sàng
+          <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span className={cn('h-2.5 w-2.5 rounded-full', statusColor)} />
+              {statusLabel}
             </div>
             <Button
               type="button"
-              className="rounded-2xl font-semibold"
+              className="rounded-full px-5 font-semibold shadow-lg shadow-slate-200 transition group-hover:bg-slate-900 group-hover:text-white"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -246,7 +249,7 @@ const QuizzesIndex = () => {
             <div className="flex flex-wrap gap-3">
               <Button type="button" onClick={handleRandomQuiz} className="rounded-2xl bg-white text-slate-900 hover:bg-white/90">
                 <Shuffle className="mr-2 h-4 w-4" />
-                Quiz ngẫu nhiên
+                Kiểm tra ngẫu nhiên
               </Button>
               <Button
                 variant="ghost"
@@ -395,7 +398,7 @@ const QuizzesIndex = () => {
           ))}
         </div>
       ) : sorted.length ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{sorted.map(renderQuizCard)}</div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">{sorted.map(renderQuizCard)}</div>
       ) : (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-white/70 p-10 text-center">
           <AlarmClock className="mx-auto h-10 w-10 text-slate-400" />
@@ -408,14 +411,19 @@ const QuizzesIndex = () => {
 };
 
 const MiniStat = ({ icon, label, value }) => (
-  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-2 text-center">
+  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3 text-center">
     <div className="flex items-center justify-center gap-1 text-xs text-slate-500">
       {icon}
       {label}
     </div>
-    <p className="mt-1 text-sm font-semibold text-slate-800">{value}</p>
+    <p className="mt-1 text-sm font-semibold text-slate-800 line-clamp-2">{value}</p>
   </div>
 );
+
+const truncateText = (text = '', maxLength = 60) => {
+  if (!text) return '';
+  return text.length > maxLength ? `${text.slice(0, maxLength).trim()}…` : text;
+};
 
 const HeroStat = ({ label, value }) => (
   <div className="rounded-2xl border border-white/20 bg-white/10 p-4 text-center">
