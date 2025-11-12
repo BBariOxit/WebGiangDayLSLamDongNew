@@ -124,6 +124,76 @@ const defaultQuizForm = () => ({
   questions: [createQuestionTemplate('single_choice')]
 });
 
+const mapQuizDetailToForm = (quiz) => {
+  if (!quiz) return defaultQuizForm();
+  const normalizeAccepted = (schema) => {
+    if (!schema) return [];
+    if (Array.isArray(schema.acceptedAnswers)) return schema.acceptedAnswers;
+    if (Array.isArray(schema.accepted_answers)) return schema.accepted_answers;
+    return [];
+  };
+  const normalizeCorrectIndexes = (schema) => {
+    if (!schema) return [];
+    if (Array.isArray(schema.correctIndexes)) return schema.correctIndexes.map(Number);
+    if (Array.isArray(schema.correct_indexes)) return schema.correct_indexes.map(Number);
+    return [];
+  };
+  const questions = (quiz.questions || []).map((question) => {
+    const questionType = (question.question_type || question.questionType || 'single_choice').toLowerCase();
+    const base = {
+      id: question.question_id || uid(),
+      questionText: question.question_text || question.questionText || '',
+      questionType,
+      explanation: question.explanation || '',
+      points: Number(question.points) > 0 ? Number(question.points) : 1
+    };
+    if (questionType === 'fill_blank') {
+      const acceptedAnswers = normalizeAccepted(question.answer_schema);
+      return {
+        ...base,
+        acceptedAnswers: acceptedAnswers.length ? acceptedAnswers : [''],
+        answers: []
+      };
+    }
+    const options = Array.isArray(question.options) ? question.options : [];
+    const correctIndexes =
+      questionType === 'multi_select'
+        ? normalizeCorrectIndexes(question.answer_schema)
+        : [typeof question.correct_index === 'number' ? question.correct_index : -1];
+    const answers =
+      options.length > 0
+        ? options.map((text, idx) => ({
+            id: `${question.question_id || base.id}-${idx}`,
+            answerText: text,
+            isCorrect: questionType === 'multi_select' ? correctIndexes.includes(idx) : idx === correctIndexes[0]
+          }))
+        : [
+            { id: uid(), answerText: '', isCorrect: true },
+            { id: uid(), answerText: '', isCorrect: false }
+          ];
+    if (answers.length === 1) {
+      answers.push({ id: uid(), answerText: '', isCorrect: false });
+    }
+    if (questionType === 'single_choice' && !answers.some((ans) => ans.isCorrect)) {
+      answers[0].isCorrect = true;
+    }
+    return {
+      ...base,
+      answers,
+      acceptedAnswers: []
+    };
+  });
+
+  return {
+    title: quiz.title || '',
+    description: quiz.description || '',
+    difficulty: quiz.difficulty || 'Cơ bản',
+    timeLimit: quiz.time_limit || quiz.timeLimit || 10,
+    assessmentType: quiz.assessment_type || quiz.assessmentType || 'quiz',
+    questions: questions.length ? questions : defaultQuizForm().questions
+  };
+};
+
 const LessonsManagement = () => {
   const { user, isTeacher, isAdmin } = useAuth();
   const buildDefaultLesson = useCallback(() => ({
@@ -151,6 +221,7 @@ const LessonsManagement = () => {
   const [success, setSuccess] = useState('');
   const [attachedQuizzes, setAttachedQuizzes] = useState([]);
   const [createQuiz, setCreateQuiz] = useState(false);
+  const [editingQuizId, setEditingQuizId] = useState(null);
   const [quizForm, setQuizForm] = useState(defaultQuizForm);
   const [listRefreshing, setListRefreshing] = useState(false);
 
@@ -189,6 +260,7 @@ const LessonsManagement = () => {
     setQuizForm(defaultQuizForm());
     setTagInput('');
     setCreateQuiz(false);
+    setEditingQuizId(null);
     setAttachedQuizzes([]);
     setEditingLesson(null);
     setActiveTab('overview');
@@ -244,11 +316,38 @@ const LessonsManagement = () => {
               .sort((a, b) => a.orderIndex - b.orderIndex)
           : []
       });
+      let fetchedQuizzes = [];
       try {
         const qres = await quizManagementService.list({ lessonId: data.lesson_id });
-        setAttachedQuizzes(qres.data || []);
+        fetchedQuizzes = qres.data || qres || [];
+        setAttachedQuizzes(fetchedQuizzes);
       } catch {
+        fetchedQuizzes = [];
         setAttachedQuizzes([]);
+      }
+      if (fetchedQuizzes.length > 0) {
+        const primaryQuizId = fetchedQuizzes[0]?.quiz_id;
+        if (primaryQuizId) {
+          try {
+            const detailRes = await quizManagementService.getById(primaryQuizId);
+            const detail = detailRes.data || detailRes;
+            setQuizForm(mapQuizDetailToForm(detail));
+            setCreateQuiz(true);
+            setEditingQuizId(primaryQuizId);
+          } catch {
+            setQuizForm(defaultQuizForm());
+            setCreateQuiz(false);
+            setEditingQuizId(null);
+          }
+        } else {
+          setEditingQuizId(null);
+          setQuizForm(defaultQuizForm());
+          setCreateQuiz(false);
+        }
+      } else {
+        setEditingQuizId(null);
+        setQuizForm(defaultQuizForm());
+        setCreateQuiz(false);
       }
       setEditingLesson(data);
       setComposerOpen(true);
@@ -461,11 +560,17 @@ const LessonsManagement = () => {
         setSuccess('Tạo bài học thành công');
       }
 
-      if (!editingLesson && createQuiz && savedLesson?.lesson_id) {
-        const quizPayload = buildQuizPayload(savedLesson.lesson_id);
+      const effectiveLessonId = savedLesson?.lesson_id || editingLesson?.lesson_id;
+      if (createQuiz && effectiveLessonId) {
+        const quizPayload = buildQuizPayload(effectiveLessonId);
         if (quizPayload.questions.length) {
-          await quizManagementService.create(quizPayload);
-          setSuccess('Tạo bài học và bài kiểm tra đi kèm thành công');
+          if (editingLesson && editingQuizId) {
+            await quizManagementService.update(editingQuizId, quizPayload);
+            setSuccess('Cập nhật bài kiểm tra thành công');
+          } else {
+            await quizManagementService.create(quizPayload);
+            setSuccess(editingLesson ? 'Đã tạo bài kiểm tra mới cho bài học' : 'Tạo bài học và bài kiểm tra đi kèm thành công');
+          }
         }
       }
 
@@ -780,6 +885,20 @@ const LessonsManagement = () => {
             )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <input
+                type="file"
+                accept="image/*"
+                ref={coverInputRef}
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <input
+                type="file"
+                accept="image/*"
+                ref={sectionImageInputRef}
+                onChange={handleSectionImageChange}
+                className="hidden"
+              />
               <TabsList className="w-full justify-between gap-2 rounded-3xl bg-slate-100 p-1">
                 <TabsTrigger value="overview" className="flex-1">Tổng quan</TabsTrigger>
                 <TabsTrigger value="sections" className="flex-1">Nội dung</TabsTrigger>
@@ -883,20 +1002,6 @@ const LessonsManagement = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={coverInputRef}
-                          onChange={handleCoverChange}
-                          className="hidden"
-                        />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={sectionImageInputRef}
-                          onChange={handleSectionImageChange}
-                          className="hidden"
-                        />
                         <p className="text-sm text-slate-500">Kéo thả hoặc chọn hình ảnh để tải lên.</p>
                         <Button variant="secondary" className="mt-3" type="button" onClick={handleCoverSelect}>
                           <Upload className="mr-2 h-4 w-4" />

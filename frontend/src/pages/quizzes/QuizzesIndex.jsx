@@ -31,6 +31,11 @@ const sortOptions = [
   { value: 'difficulty', label: 'Độ khó' },
 ];
 
+const getQuestionCount = (quiz = {}) => {
+  if (Array.isArray(quiz.questions)) return quiz.questions.length;
+  return Number(quiz.question_count || quiz.question_total || 0);
+};
+
 const QuizzesIndex = () => {
   const navigate = useNavigate();
   const [search, setSearch] = React.useState('');
@@ -100,10 +105,7 @@ const QuizzesIndex = () => {
       (sum, quiz) => sum + Number(quiz.time_limit || quiz.duration || 0),
       0
     );
-    const totalQuestions = sorted.reduce((sum, quiz) => {
-      if (Array.isArray(quiz.questions)) return sum + quiz.questions.length;
-      return sum + Number(quiz.question_count || quiz.question_total || 0);
-    }, 0);
+    const totalQuestions = sorted.reduce((sum, quiz) => sum + getQuestionCount(quiz), 0);
     const topicMap = sorted.reduce((acc, quiz) => {
       const category = quiz.category || 'Chưa phân loại';
       acc[category] = (acc[category] || 0) + 1;
@@ -120,7 +122,12 @@ const QuizzesIndex = () => {
     };
   }, [sorted]);
 
-  const featured = sorted.slice(0, 3);
+  const featured = useMemo(() => {
+    const sortedByQuestions = [...sorted].sort(
+      (a, b) => getQuestionCount(b) - getQuestionCount(a)
+    );
+    return sortedByQuestions.slice(0, 3);
+  }, [sorted]);
 
   const handleClearFilters = () => {
     setSearch('');
@@ -247,16 +254,13 @@ const QuizzesIndex = () => {
               giúp trải nghiệm thống nhất với hệ thống.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" onClick={handleRandomQuiz} className="rounded-2xl bg-white text-slate-900 hover:bg-white/90">
+              <Button
+                type="button"
+                onClick={handleRandomQuiz}
+                className="rounded-2xl bg-white text-slate-900 hover:bg-white/90"
+              >
                 <Shuffle className="mr-2 h-4 w-4" />
                 Kiểm tra ngẫu nhiên
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={handleClearFilters}
-                className="rounded-2xl border border-white/30 bg-white/10 text-white hover:bg-white/20"
-              >
-                Đặt lại bộ lọc
               </Button>
             </div>
           </div>

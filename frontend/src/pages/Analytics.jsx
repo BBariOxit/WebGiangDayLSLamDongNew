@@ -144,7 +144,12 @@ const Analytics = () => {
 
   const roleCountsMap = useMemo(() => {
     if (!data?.roleCounts) return {};
-    return Object.fromEntries((data.roleCounts || []).map((item) => [item.role, Number(item.total || 0)]));
+    return Object.fromEntries(
+      (data.roleCounts || []).map((item) => [
+        String(item.role || 'unknown').toLowerCase(),
+        Number(item.total || 0)
+      ])
+    );
   }, [data]);
 
   if (!user) {
@@ -226,12 +231,15 @@ const AdminDashboard = ({ data, roleCountsMap }) => {
   const globals = data?.globals || {};
   const trend = data?.trend || [];
   const breakdown = data?.breakdown || [];
-  const roleDistribution = useMemo(() => (
-    Object.entries(roleCountsMap || {}).map(([role, total]) => ({
-      role: role === 'admin' ? 'Quản trị' : role === 'teacher' ? 'Giảng viên' : 'Học viên',
-      total: Number(total)
-    }))
-  ), [roleCountsMap]);
+  const roleDistribution = useMemo(() => {
+    if (!roleCountsMap) return [];
+    const studentTotal = Number(roleCountsMap.student || 0);
+    const teacherTotal = Number(roleCountsMap.teacher || 0);
+    return [
+      { role: 'Học viên', total: studentTotal },
+      { role: 'Giảng viên', total: teacherTotal }
+    ].filter((item) => item.total > 0);
+  }, [roleCountsMap]);
   const normalizedTrend = useMemo(() => (
     (trend || []).map((item) => ({
       ...item,
