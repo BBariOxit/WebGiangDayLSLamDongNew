@@ -157,13 +157,15 @@ const theme = createTheme({
   },
 });
 
+const RootWrapper = import.meta.env.PROD ? React.StrictMode : React.Fragment;
+
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  <RootWrapper>
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
         <App />
       </Router>
     </ThemeProvider>
-  </React.StrictMode>
+  </RootWrapper>
 );

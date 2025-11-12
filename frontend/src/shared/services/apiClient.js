@@ -1,4 +1,6 @@
 import axios from 'axios';
+import store from '../../app/store';
+import { logout } from '../../features/auth/authSlice';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
@@ -11,6 +13,13 @@ const apiClient = axios.create({
   withCredentials: false,
 });
 
+const forceLogout = () => {
+  store.dispatch(logout());
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+};
+
 // Request interceptor - add auth token
 apiClient.interceptors.request.use(
   (config) => {
@@ -20,9 +29,7 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor - handle errors globally
@@ -30,7 +37,7 @@ let isRefreshing = false;
 let pendingQueue = [];
 
 function processQueue(error, token = null) {
-  pendingQueue.forEach(prom => {
+  pendingQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
@@ -43,11 +50,13 @@ function processQueue(error, token = null) {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
     const status = error.response?.status;
+    const hasAuthHeader = Boolean(originalRequest.headers?.Authorization);
+    const isAuthRoute = typeof originalRequest.url === 'string' && originalRequest.url.includes('/auth/');
 
-    // Attempt refresh on 401 once
-    if (status === 401 && !originalRequest._retry) {
+    // Attempt refresh on 401 once (only for requests that included auth header)
+    if (status === 401 && hasAuthHeader && !isAuthRoute && !originalRequest._retry) {
       originalRequest._retry = true;
       if (isRefreshing) {
         // queue the request until refresh completes
@@ -55,7 +64,7 @@ apiClient.interceptors.response.use(
           const newToken = await new Promise((resolve, reject) => {
             pendingQueue.push({ resolve, reject });
           });
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         } catch (e) {
           return Promise.reject(e);
@@ -70,25 +79,27 @@ apiClient.interceptors.response.use(
         if (!res.data?.success) throw new Error('Refresh failed');
         const { accessToken, refreshToken: newRefresh, user } = res.data.data;
         localStorage.setItem('authToken', accessToken);
-        if (newRefresh) localStorage.setItem('refreshToken', newRefresh);
-        if (user) localStorage.setItem('user', JSON.stringify(user));
+        if (newRefresh) {
+          localStorage.setItem('refreshToken', newRefresh);
+        }
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+        }
         processQueue(null, accessToken);
         // retry original
-        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
-        // Clear and redirect to login
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
+        forceLogout();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
       }
+    }
+
+    if (status === 401 && hasAuthHeader && !originalRequest._retry) {
+      forceLogout();
     }
 
     if (status === 403) {

@@ -26,7 +26,7 @@ import QuizzesManagement from '../../features/admin/pages/QuizzesManagement';
 import TeacherLessons from '../../pages/teacher/TeacherLessons';
 import MyQuizzes from '../../features/teacher/pages/MyQuizzes';
 
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography, Button, CircularProgress } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
 // 404 Component
@@ -73,7 +73,42 @@ const NotFound = () => {
 };
 
 const AppRoutes = () => {
-  const { user } = useAuth();
+  const { user, hydrated } = useAuth();
+
+  if (!hydrated) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          textAlign: 'center',
+          p: 3,
+        }}
+      >
+        <CircularProgress
+          size={60}
+          sx={{
+            color: 'white',
+            mb: 3,
+            '& .MuiCircularProgress-circle': {
+              strokeLinecap: 'round',
+            },
+          }}
+        />
+        <Typography variant="h6" sx={{ fontWeight: 500 }}>
+          Đang khởi tạo ứng dụng...
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          Vui lòng chờ trong giây lát
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Routes>

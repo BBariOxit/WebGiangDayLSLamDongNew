@@ -39,10 +39,10 @@ const LoadingScreen = () => (
 );
 
 const ProtectedRoute = ({ children, requiredRole = null, redirectTo = '/login' }) => {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, hydrated } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || !hydrated) {
     return <LoadingScreen />;
   }
 

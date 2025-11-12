@@ -13,7 +13,29 @@ const initialState = {
 
 function persist(state) {
   const minimal = { user: state.user, accessToken: state.accessToken, refreshToken: state.refreshToken };
-  localStorage.setItem('authState', JSON.stringify(minimal));
+  if (minimal.user || minimal.accessToken || minimal.refreshToken) {
+    localStorage.setItem('authState', JSON.stringify(minimal));
+  } else {
+    localStorage.removeItem('authState');
+  }
+
+  if (state.accessToken) {
+    localStorage.setItem('authToken', state.accessToken);
+  } else {
+    localStorage.removeItem('authToken');
+  }
+
+  if (state.refreshToken) {
+    localStorage.setItem('refreshToken', state.refreshToken);
+  } else {
+    localStorage.removeItem('refreshToken');
+  }
+
+  if (state.user) {
+    localStorage.setItem('user', JSON.stringify(state.user));
+  } else {
+    localStorage.removeItem('user');
+  }
 }
 
 const authSlice = createSlice({
