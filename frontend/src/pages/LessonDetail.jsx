@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
   ArrowLeft,
@@ -31,14 +31,17 @@ import {
   addBookmarkApi,
   removeBookmarkApi,
   fetchProgress,
-  saveProgress
+  saveProgress,
+  listQuizAttempts
 } from '../api/lessonEngagementApi';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const QUIZ_PASSING_SCORE = 70;
 
 const LessonDetail = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   const [lesson, setLesson] = useState(null);
@@ -49,10 +52,52 @@ const LessonDetail = () => {
   const [quizzesForLesson, setQuizzesForLesson] = useState([]);
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [lessonQuiz, setLessonQuiz] = useState(null);
+  const [quizCompletion, setQuizCompletion] = useState({});
+  const [quizStatusLoading, setQuizStatusLoading] = useState(false);
+  const [showQuizSelector, setShowQuizSelector] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [ratingSummary, setRatingSummary] = useState({ avg_rating: 0, rating_count: 0 });
   const [studySessionPosted, setStudySessionPosted] = useState(false);
   const lastSavedProgressRef = useRef(0);
+
+  const quizItems = useMemo(() => {
+    if (quizzesForLesson.length > 0) {
+      return quizzesForLesson.map((quiz) => ({
+        id: String(quiz.quiz_id),
+        title: quiz.title,
+        questionCount:
+          quiz.question_count ??
+          quiz.questions_count ??
+          quiz.questionCount ??
+          quiz.questions?.length ??
+          0,
+        duration: quiz.time_limit ?? quiz.duration_minutes ?? quiz.duration ?? null,
+        difficulty: quiz.difficulty || lesson?.difficulty || 'Cơ bản',
+        source: 'api'
+      }));
+    }
+    if (lessonQuiz) {
+      return [
+        {
+          id: String(lessonQuiz.id),
+          title: lessonQuiz.title || 'Quiz tổng hợp',
+          questionCount: lessonQuiz.questions?.length || 0,
+          duration: lessonQuiz.timeLimit ? `${lessonQuiz.timeLimit} phút` : null,
+          difficulty: lessonQuiz.difficulty || lesson?.difficulty || 'Cơ bản',
+          source: 'legacy'
+        }
+      ];
+    }
+    return [];
+  }, [quizzesForLesson, lessonQuiz, lesson?.difficulty]);
+
+  const quizSummary = useMemo(() => {
+    const total = quizItems.length;
+    const completedCount = total
+      ? quizItems.filter((quiz) => quizCompletion[quiz.id]?.completed).length
+      : 0;
+    return { total, completedCount };
+  }, [quizItems, quizCompletion]);
 
   useEffect(() => {
     const fetchLesson = async () => {
@@ -177,6 +222,63 @@ const LessonDetail = () => {
   }, [lesson?.id, studySessionPosted]);
 
   useEffect(() => {
+    if (quizItems.length === 0 && showQuizSelector) {
+      setShowQuizSelector(false);
+    }
+  }, [quizItems.length, showQuizSelector]);
+
+  useEffect(() => {
+    if (!user || quizItems.length === 0) {
+      setQuizCompletion({});
+      setQuizStatusLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setQuizStatusLoading(true);
+    (async () => {
+      const entries = await Promise.all(
+        quizItems.map(async (quiz) => {
+          try {
+            if (quiz.source === 'api') {
+              const attempts = await listQuizAttempts(quiz.id);
+              return [quiz.id, computeQuizCompletionMeta(attempts)];
+            }
+            const attempts = quizService
+              .getAttemptsByQuiz(quiz.id)
+              .filter((attempt) => String(attempt.userId) === String(user.id));
+            return [quiz.id, computeQuizCompletionMeta(attempts)];
+          } catch (err) {
+            console.warn(`Load quiz attempts failed for ${quiz.id}`, err);
+            return [quiz.id, computeQuizCompletionMeta([])];
+          }
+        })
+      );
+      if (!cancelled) {
+        setQuizCompletion(Object.fromEntries(entries));
+      }
+    })()
+      .catch((err) => console.warn('Failed to build quiz completion map', err))
+      .finally(() => {
+        if (!cancelled) setQuizStatusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, quizItems]);
+
+  useEffect(() => {
+    if (!lesson?.id || !user || quizItems.length === 0) return;
+    const allDone = quizItems.every((quiz) => quizCompletion[quiz.id]?.completed);
+    if (allDone && (lastSavedProgressRef.current < 100 || !completed)) {
+      setCompleted(true);
+      lastSavedProgressRef.current = 100;
+      saveProgress(lesson.id, 100).catch((err) => console.warn('saveProgress failed', err));
+    } else if (!allDone && completed) {
+      setCompleted(false);
+    }
+  }, [quizCompletion, quizItems, lesson?.id, user?.id, completed]);
+
+  useEffect(() => {
     const MIN_DELTA = 10;
     const handleScroll = () => {
       const winScroll = document.documentElement.scrollTop;
@@ -251,7 +353,18 @@ const LessonDetail = () => {
       window.alert('Bài học này chưa có quiz.');
       return;
     }
-    navigate(`/quizzes/take/${targetId}`);
+    navigate(`/quizzes/take/${targetId}`, { state: { fromLesson: location.pathname } });
+  };
+
+  const handleQuizButtonClick = () => {
+    if (!(quizzesForLesson.length > 0 || lessonQuiz)) {
+      window.alert('Bài học này chưa có quiz.');
+      return;
+    }
+    if (!selectedQuizId && quizItems.length > 0) {
+      setSelectedQuizId(quizItems[0].id);
+    }
+    setShowQuizSelector((prev) => !prev);
   };
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -395,42 +508,51 @@ const LessonDetail = () => {
                 )}
                 <Button
                   className={cn(
-                    'rounded-full px-6 shadow-lg shadow-rose-200',
+                    'rounded-full bg-sky-500 px-6 shadow-lg shadow-sky-200 hover:bg-sky-600',
                     (quizzesForLesson.length === 0 && !lessonQuiz) && 'pointer-events-none opacity-60'
                   )}
-                  onClick={handleQuizNavigate}
+                  onClick={handleQuizButtonClick}
                 >
                   {(quizzesForLesson.length > 0 || lessonQuiz) ? 'Làm bài kiểm tra' : 'Chưa có bài kiểm tra'}
                 </Button>
               </div>
             </div>
 
-            {(quizzesForLesson.length > 0 || lessonQuiz) && (
-              <div className="rounded-3xl border border-slate-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            {showQuizSelector && quizItems.length > 0 && (
+              <div className="rounded-3xl border border-slate-100 bg-white/80 p-4 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-700">Bài kiểm tra đi kèm</p>
+                    <p className="text-sm font-semibold text-slate-800">Chọn bài kiểm tra</p>
                     <p className="text-xs text-slate-500">
-                      {quizzesForLesson.length
-                        ? 'Chọn bài kiểm tra để luyện tập sâu theo từng chủ đề.'
-                        : `Bài kiểm tra gồm ${lessonQuiz?.questions?.length || 0} câu hỏi${
-                            lessonQuiz?.timeLimit ? ` · ${lessonQuiz.timeLimit} phút` : ''
-                          }.`}
+                      Lựa chọn bài kiểm tra bạn muốn thực hiện. Điểm số sẽ được lưu vào tiến độ của bạn.
                     </p>
                   </div>
-                  {quizzesForLesson.length > 0 && (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <select
                       value={selectedQuizId || ''}
                       onChange={(event) => setSelectedQuizId(event.target.value)}
                       className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                     >
-                      {quizzesForLesson.map((quiz) => (
-                        <option key={quiz.quiz_id} value={quiz.quiz_id}>
-                          {quiz.title} · {quiz.question_count || 0} câu hỏi
+                      {quizItems.map((quiz) => (
+                        <option key={quiz.id} value={quiz.id}>
+                          {quiz.title} · {quiz.questionCount} câu hỏi
                         </option>
                       ))}
                     </select>
-                  )}
+                    <div className="flex gap-2">
+                      <Button size="sm" className="rounded-full px-4" onClick={handleQuizNavigate}>
+                        Bắt đầu
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full px-4 text-slate-500 hover:text-slate-700"
+                        onClick={() => setShowQuizSelector(false)}
+                      >
+                        Đóng
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -471,6 +593,82 @@ const LessonDetail = () => {
             </Card>
           )}
         </div>
+
+        {quizItems.length > 0 && (
+          <Card className="rounded-[28px] border-none bg-white shadow-smooth">
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="text-xl text-slate-900">Danh sách bài kiểm tra</CardTitle>
+                <p className="text-sm text-slate-500">
+                  {user
+                    ? `${quizSummary.completedCount}/${quizSummary.total} bài đã hoàn thành`
+                    : 'Đăng nhập để lưu tiến độ làm bài kiểm tra'}
+                </p>
+              </div>
+              {quizStatusLoading && <span className="text-xs text-slate-400">Đang đồng bộ tiến độ...</span>}
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {quizItems.map((quiz) => {
+                  const completion = quizCompletion[quiz.id] || {};
+                  const isFinished = Boolean(completion.completed);
+                  const bestScore = Number.isFinite(completion.bestScore) ? completion.bestScore : null;
+                  const attemptsCount = completion.attemptCount || 0;
+                  const lastAttemptText = completion.lastAttemptAt
+                    ? formatAttemptDate(completion.lastAttemptAt)
+                    : null;
+
+                  return (
+                    <div
+                      key={quiz.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 shadow-inner"
+                    >
+                      <div className="flex items-center justify-between text-xs font-semibold">
+                        <Badge
+                          className={cn(
+                            'rounded-full px-3 py-0.5',
+                            isFinished ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                          )}
+                        >
+                          {isFinished ? 'Hoàn thành' : 'Chưa làm'}
+                        </Badge>
+                        {user && (
+                          <span className="text-slate-500">
+                            Điểm cao nhất: {bestScore !== null ? `${bestScore}/100` : '—'}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-slate-900">{quiz.title}</p>
+                        <p className="text-xs text-slate-500">
+                          {quiz.questionCount} câu hỏi · {quiz.difficulty}
+                        </p>
+                      </div>
+                      {user && lastAttemptText && (
+                        <div className="text-xs text-slate-500">
+                          <p>Lần cuối: {lastAttemptText}</p>
+                        </div>
+                      )}
+                      <div className="mt-auto flex items-center justify-between">
+                        <span className="text-xs text-slate-500">
+                          {isFinished ? 'Xem lại kiến thức' : 'Sẵn sàng thử sức'}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-full px-4"
+                          onClick={() => navigate(`/quizzes/take/${quiz.id}`, { state: { fromLesson: location.pathname } })}
+                        >
+                          {isFinished ? 'Làm lại' : 'Làm ngay'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="rounded-[28px] border-none bg-white shadow-smooth">
           <CardHeader>
@@ -535,6 +733,13 @@ function extractHeroImages(lesson) {
     unique.push(normalized);
   });
   return unique.slice(0, 3);
+}
+
+function formatAttemptDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function normalizeSections(sections) {
@@ -634,6 +839,27 @@ function renderSectionBody(section) {
       )}
     </div>
   );
+}
+
+function computeQuizCompletionMeta(attempts = []) {
+  if (!Array.isArray(attempts) || attempts.length === 0) {
+    return { completed: false, bestScore: 0, attemptCount: 0, lastAttemptAt: null };
+  }
+  const bestScore = attempts.reduce((max, attempt) => {
+    const score = Number(attempt.score ?? attempt.best_score ?? attempt.bestScore ?? 0);
+    return Number.isFinite(score) ? Math.max(max, score) : max;
+  }, 0);
+  const lastAttemptAt =
+    attempts[0]?.created_at ||
+    attempts[0]?.createdAt ||
+    attempts[0]?.updated_at ||
+    null;
+  return {
+    completed: bestScore >= QUIZ_PASSING_SCORE,
+    bestScore,
+    attemptCount: attempts.length,
+    lastAttemptAt
+  };
 }
 
 export default LessonDetail;

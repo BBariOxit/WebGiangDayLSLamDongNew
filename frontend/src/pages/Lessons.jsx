@@ -49,6 +49,16 @@ const statusFilters = [
   { value: 'saved', label: 'Đã lưu' },
 ];
 
+const DEFAULT_RATING = 5;
+
+const ensureRatingValue = (value, fallback = DEFAULT_RATING) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+};
+
+const formatRating = (value, fallback = DEFAULT_RATING) =>
+  Math.round(ensureRatingValue(value, fallback) * 10) / 10;
+
 const fallbackImage = (label = 'Bài học', theme = 'default') => {
   const encoded = encodeURIComponent(label);
   const gradients = {
@@ -165,9 +175,9 @@ const Lessons = () => {
         const normalized = (payload || []).map((lesson) => {
           const lessonId = Number(lesson.lesson_id ?? lesson.id);
           const progress = progressMap.get(lessonId) || {};
-          const ratingRaw = Number(lesson.avg_rating ?? lesson.rating ?? 0);
+          const ratingRaw = lesson.avg_rating ?? lesson.rating ?? lesson.avgRating;
+          const rating = formatRating(ratingRaw);
           const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
-          const rating = ratingCount > 0 && Number.isFinite(ratingRaw) ? Math.round(ratingRaw * 10) / 10 : 0;
 
           const imageCandidates = parseImages(lesson.images, lesson.title);
           const firstImage = imageCandidates[0]?.url;
@@ -235,9 +245,10 @@ const Lessons = () => {
     LESSON_SECTIONS.map((section) => {
       const source = section.id === 'landmarks' ? lessons : SAMPLE_LESSONS[section.id] || [];
       const minutes = extractMinutes(source);
-      const rating = source.length
-        ? Math.round((source.reduce((sum, item) => sum + (item.rating || 0), 0) / source.length) * 10) / 10
-        : 0;
+      const ratingValues = source.map((item) => ensureRatingValue(item.rating));
+      const rating = ratingValues.length
+        ? Math.round((ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length) * 10) / 10
+        : DEFAULT_RATING;
       const learners = source.reduce((sum, item) => sum + (item.studyCount || 0), 0);
       return {
         ...section,
@@ -256,6 +267,7 @@ const Lessons = () => {
       ...item,
       coverImage: item.coverImage || fallbackImage(item.title),
       images: Array.isArray(item.images) && item.images.length > 0 ? item.images : [{ url: fallbackImage(item.title) }],
+      rating: formatRating(item.rating),
       progress: Number(item.progress ?? 0),
       isCompleted: Boolean(item.isCompleted),
       bestScore: Number(item.bestScore ?? 0),
@@ -263,18 +275,10 @@ const Lessons = () => {
     }));
   }, [activeSection, lessons]);
 
-  const filteredLessons = useMemo(() => {
+  const baseFilteredLessons = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
     return sectionLessons.filter((lesson) => {
       if (difficultyFilter !== 'all' && lesson.difficulty !== difficultyFilter) {
-        return false;
-      }
-
-      if (activeSection?.id === 'landmarks') {
-        if (statusFilter === 'in-progress' && !(lesson.progress > 0 && !lesson.isCompleted)) return false;
-        if (statusFilter === 'completed' && !lesson.isCompleted) return false;
-        if (statusFilter === 'saved' && !bookmarked.has(Number(lesson.id))) return false;
-      } else if (statusFilter !== 'all') {
         return false;
       }
 
@@ -282,16 +286,62 @@ const Lessons = () => {
       const haystack = [lesson.title, lesson.summary, lesson.category, (lesson.tags || []).join(' ')].join(' ').toLowerCase();
       return haystack.includes(search);
     });
-  }, [sectionLessons, searchTerm, difficultyFilter, statusFilter, activeSection, bookmarked]);
+  }, [sectionLessons, searchTerm, difficultyFilter]);
+
+  const filteredLessons = useMemo(() => {
+    if (activeSection?.id !== 'landmarks') {
+      return statusFilter === 'all' ? baseFilteredLessons : [];
+    }
+
+    if (statusFilter === 'all') return baseFilteredLessons;
+
+    return baseFilteredLessons.filter((lesson) => {
+      if (statusFilter === 'in-progress') {
+        return lesson.progress > 0 && !lesson.isCompleted;
+      }
+
+      if (statusFilter === 'completed') {
+        return lesson.isCompleted;
+      }
+
+      if (statusFilter === 'saved') {
+        return bookmarked.has(Number(lesson.id));
+      }
+
+      return true;
+    });
+  }, [baseFilteredLessons, statusFilter, activeSection, bookmarked]);
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: baseFilteredLessons.length,
+      'in-progress': 0,
+      completed: 0,
+      saved: 0,
+    };
+
+    if (activeSection?.id !== 'landmarks') {
+      return counts;
+    }
+
+    baseFilteredLessons.forEach((lesson) => {
+      if (lesson.progress > 0 && !lesson.isCompleted) counts['in-progress'] += 1;
+      if (lesson.isCompleted) counts.completed += 1;
+      if (bookmarked.has(Number(lesson.id))) counts.saved += 1;
+    });
+
+    return counts;
+  }, [baseFilteredLessons, activeSection, bookmarked]);
 
   const stats = useMemo(() => {
     const totalLessons = sectionLessons.length;
     const totalMinutes = extractMinutes(sectionLessons);
     const totalLearners = sectionLessons.reduce((sum, lesson) => sum + (lesson.studyCount || 0), 0);
-    const averageRating = sectionLessons.length
-      ? Math.round((sectionLessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / sectionLessons.length) * 10) / 10
-      : 0;
-    return { totalLessons, totalMinutes, totalLearners, averageRating };
+    const totalRating = sectionLessons.reduce((sum, lesson) => sum + ensureRatingValue(lesson.rating), 0);
+    const averageRating = totalLessons
+      ? Math.round((totalRating / totalLessons) * 10) / 10
+      : DEFAULT_RATING;
+    return { totalLessons, totalMinutes, totalLearners, totalRating, averageRating };
   }, [sectionLessons]);
 
   const toggleBookmark = async (lessonId) => {
@@ -446,7 +496,7 @@ const Lessons = () => {
                   key={section.id}
                   type="button"
                   onClick={() => navigate(`/lessons/${section.id}`)}
-                  className="group relative flex min-h-[28rem] flex-col overflow-hidden rounded-[2rem] border-0 bg-white p-10 text-left shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/50 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-slate-300/60 hover:ring-slate-300/70 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                  className="group relative flex min-h-[28rem] flex-col overflow-hidden rounded-[2rem] border-0 bg-white p-10 text-left shadow-xl shadow-slate-200/60 ring-2 ring-slate-300/60 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-slate-300/60 hover:ring-slate-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
                 >
                   {/* Gradient overlay on hover */}
                   <div className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" aria-hidden="true">
@@ -483,7 +533,7 @@ const Lessons = () => {
                   <div className="relative mt-8 grid grid-cols-3 gap-4">
                     <StatsPill label="Bài học" value={formatNumber(section.lessonCount)} />
                     <StatsPill label="Thời lượng" value={`${formatNumber(section.minutes)}'`} />
-                    <StatsPill label="Đánh giá" value={section.rating ? `${section.rating}/5` : '—'} />
+                    <StatsPill label="Đánh giá" value={`${formatRating(section.rating)}/5`} />
                   </div>
 
                   {/* Spacer to push footer to bottom */}
@@ -582,17 +632,17 @@ const Lessons = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Tìm kiếm bài học..."
-                className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="h-11 w-full rounded-xl border-2 border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
               />
             </div>
 
-            {/* Danh mục */}
+            {/* Difficulty */}
             <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-slate-600">Danh mục:</label>
+              <label className="text-sm font-medium text-slate-600">Độ khó:</label>
               <select
                 value={difficultyFilter}
                 onChange={(e) => setDifficultyFilter(e.target.value)}
-                className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="h-11 min-w-[140px] cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
               >
                 <option value="all">Tất cả</option>
                 {difficultyFilters.filter(f => f !== 'all').map((option) => (
@@ -601,24 +651,11 @@ const Lessons = () => {
               </select>
             </div>
 
-            {/* Độ khó */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-slate-600">Độ khó:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              >
-                {statusFilters.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-
+            {/* Status */}
             {/* Sắp xếp */}
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium text-slate-600">Sắp xếp:</label>
-              <select className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200">
+              <select className="h-11 min-w-[140px] cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200">
                 <option>Mới nhất</option>
                 <option>Cũ nhất</option>
                 <option>Phổ biến nhất</option>
@@ -626,48 +663,48 @@ const Lessons = () => {
             </div>
 
             {/* Clear Button */}
-            {(searchTerm || difficultyFilter !== 'all' || statusFilter !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setDifficultyFilter('all');
-                  setStatusFilter('all');
-                }}
-                className="flex h-11 items-center gap-2 rounded-xl border border-sky-300 bg-white px-5 text-sm font-medium text-sky-600 transition-colors hover:bg-sky-50"
-              >
-                <span className="text-lg">✕</span>
-                Xóa bộ lọc
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setDifficultyFilter('all');
+                setStatusFilter('all');
+              }}
+              className="flex h-11 items-center gap-2 rounded-xl border border-sky-300 bg-white px-5 text-sm font-medium text-sky-600 transition-colors hover:bg-sky-50"
+            >
+              <span className="text-lg">✕</span>
+              Xóa bộ lọc
+            </button>
           </div>
 
           {/* Status Tabs - Centered */}
-          <div className="flex items-center justify-center gap-2 pt-4">
-            {[
-              { label: 'TẤT CẢ', count: filteredLessons.length, value: 'all' },
-              { label: 'ĐANG HỌC', count: 3, value: 'learning' },
-              { label: 'HOÀN THÀNH', count: 1, value: 'completed' },
-              { label: 'ĐÃ LƯU', count: 2, value: 'saved' },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setStatusFilter(tab.value)}
-                className={cn(
-                  'relative px-8 py-3 text-sm font-semibold transition-all',
-                  statusFilter === tab.value
-                    ? 'text-sky-600'
-                    : 'text-slate-500 hover:text-slate-700',
-                )}
-              >
-                {tab.label} ({tab.count})
-                {statusFilter === tab.value && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-sky-600" />
-                )}
-              </button>
-            ))}
-          </div>
+          {showStatusFilters && (
+            <div className="flex items-center justify-center gap-2 pt-4">
+              {[
+                { label: 'TẤT CẢ', value: 'all' },
+                { label: 'ĐANG HỌC', value: 'in-progress' },
+                { label: 'HOÀN THÀNH', value: 'completed' },
+                { label: 'ĐÃ LƯU', value: 'saved' },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.value)}
+                  className={cn(
+                    'relative px-8 py-3 text-sm font-semibold transition-all',
+                    statusFilter === tab.value
+                      ? 'text-sky-600'
+                      : 'text-slate-500 hover:text-slate-700',
+                  )}
+                >
+                  {tab.label} ({statusCounts[tab.value] ?? 0})
+                  {statusFilter === tab.value && (
+                    <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-sky-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -738,9 +775,7 @@ const Lessons = () => {
             { label: 'LƯỢT HỌC', value: formatNumber(stats.totalLearners), icon: Users, gradient: 'from-amber-500 to-orange-600' },
             { 
               label: 'ĐÁNH GIÁ', 
-              value: stats.totalLessons > 0 && stats.totalRating > 0 
-                ? `${(stats.totalRating / stats.totalLessons).toFixed(1)}/5` 
-                : '0.0/5', 
+              value: `${(stats.averageRating ?? DEFAULT_RATING).toFixed(1)}/5`, 
               icon: Star, 
               gradient: 'from-violet-500 to-purple-600' 
             },
@@ -823,7 +858,7 @@ const LessonCard = ({ lesson, onOpen, showBookmark, bookmarked, onBookmarkToggle
                   : 'bg-white text-slate-700',
             )}
           >
-            {isCompleted ? 'Đang học' : inProgress ? 'Đang học' : 'Mới'}
+            {isCompleted ? 'Hoàn thành' : inProgress ? 'Đang học' : 'Mới'}
           </span>
         </div>
 
@@ -880,7 +915,7 @@ const LessonCard = ({ lesson, onOpen, showBookmark, bookmarked, onBookmarkToggle
           </span>
           <span className="inline-flex items-center gap-1">
             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-slate-700">{lesson.rating || '—'}</span>
+            <span className="font-semibold text-slate-700">{formatRating(lesson.rating)}</span>
           </span>
         </div>
 
@@ -937,7 +972,7 @@ const LessonCard = ({ lesson, onOpen, showBookmark, bookmarked, onBookmarkToggle
 };
 
 const StatsPill = ({ label, value }) => (
-  <div className="group flex min-h-[6rem] flex-col items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 px-4 py-5 text-center shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+  <div className="group flex min-h-[6rem] flex-col items-center justify-between gap-3 rounded-2xl border-2 border-slate-300 bg-gradient-to-br from-white to-slate-50/50 px-4 py-5 text-center shadow-sm transition-all hover:border-slate-400 hover:shadow-md">
     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
     <p className="flex items-baseline justify-center text-2xl font-bold leading-none text-slate-800 transition-colors group-hover:text-slate-900">{value}</p>
   </div>
@@ -948,7 +983,7 @@ const LoadingState = () => (
     {Array.from({ length: 6 }).map((_, index) => (
       <div
         key={index}
-        className="flex h-full animate-pulse flex-col gap-5 overflow-hidden rounded-[2rem] border-0 bg-white p-0 shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/50"
+        className="flex h-full animate-pulse flex-col gap-5 overflow-hidden rounded-[2rem] border-0 bg-white p-0 shadow-xl shadow-slate-200/60 ring-2 ring-slate-300/60"
       >
         <div className="h-52 w-full bg-gradient-to-br from-slate-200 to-slate-300" />
         <div className="space-y-4 px-7 pb-7">

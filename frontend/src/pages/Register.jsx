@@ -184,7 +184,7 @@ const Register = () => {
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent'
                   }}>
-                    Đăng ký
+                    Đăng ký tài khoản
                   </Typography>
                   
                   <Typography variant="body2" color="text.secondary">
@@ -354,7 +354,7 @@ const Register = () => {
                     <Link 
                       to="/login" 
                       style={{ 
-                        color: '#667eea',
+                        color: '#0ea5e9',
                         textDecoration: 'none',
                         fontWeight: 'bold'
                       }}

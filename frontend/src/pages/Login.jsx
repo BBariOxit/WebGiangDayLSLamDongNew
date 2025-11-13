@@ -389,7 +389,7 @@ const Login = () => {
                     <Link 
                       to="/register" 
                       style={{ 
-                        color: '#667eea',
+                        color: '#0ea5e9',
                         textDecoration: 'none',
                         fontWeight: 'bold'
                       }}

@@ -113,7 +113,7 @@ const Home = () => {
     ? (ratedLessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / ratedLessons.length).toFixed(1)
     : '0.0';
   const stats = [
-  { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#2196f3' },
+  { icon: MenuBook, label: 'Bài học', value: lessons.length, color: '#0ea5e9' },
   { icon: Quiz, label: 'Phút học', value: `${totalMinutes}+`, color: '#ff6b6b' },
   { icon: People, label: 'Lượt học', value: `${Math.max(0, Math.round(totalStudySessions/10)*10)}+`, color: '#4caf50' },
     { icon: EmojiEvents, label: 'Đánh giá', value: `${averageRating}/5⭐`, color: '#ff9800' }
@@ -175,14 +175,14 @@ const Home = () => {
                       startIcon={<Login />}
                       onClick={() => navigate('/login')}
                       sx={{
-                        background: 'linear-gradient(135deg, #2196f3, #21cbf3)',
+                        background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
                         color: 'white',
                         fontWeight: 'bold',
-                        boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)',
+                        boxShadow: '0 4px 15px rgba(14, 165, 233, 0.3)',
                         '&:hover': {
-                          background: 'linear-gradient(135deg, #1976d2, #2196f3)',
+                          background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 6px 20px rgba(33, 150, 243, 0.4)'
+                          boxShadow: '0 6px 20px rgba(14, 165, 233, 0.4)'
                         }
                       }}
                     >
@@ -288,7 +288,7 @@ const Home = () => {
           <Box sx={{ textAlign: 'center', mb: 6 }}>
             <Typography variant="h3" component="h2" gutterBottom sx={{
               fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #1976d2, #2196f3)',
+              background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
@@ -341,9 +341,9 @@ const Home = () => {
                         bottom: -28,
                         right: 20,
                         bgcolor: 'white',
-                        color: 'primary.main',
+                        color: '#0ea5e9',
                         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                        '&:hover': { bgcolor: 'primary.main', color: 'white' }
+                        '&:hover': { bgcolor: '#0ea5e9', color: 'white' }
                       }}
                       onClick={() => navigate(`/lesson/${lesson.slug}`)}
                     >
@@ -415,9 +415,9 @@ const Home = () => {
               endIcon={<ArrowForward />}
               onClick={() => navigate('/lessons')}
               sx={{
-                background: 'linear-gradient(135deg, #2196f3, #21cbf3)',
+                background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #1976d2, #1e88e5)'
+                  background: 'linear-gradient(135deg, #0284c7, #0ea5e9)'
                 }
               }}
             >
@@ -432,7 +432,7 @@ const Home = () => {
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="h3" component="h2" gutterBottom sx={{
             fontWeight: 'bold',
-            background: 'linear-gradient(135deg, #1976d2, #2196f3)',
+            background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
@@ -447,7 +447,7 @@ const Home = () => {
               icon: LocalLibrary,
               title: 'Nội dung chất lượng',
               description: 'Bài học được biên soạn bởi các chuyên gia với nội dung phong phú, chính xác',
-              color: '#2196f3'
+              color: '#0ea5e9'
             },
             {
               icon: Quiz,
@@ -502,7 +502,7 @@ const Home = () => {
       </Container>
 
       {/* CTA Section */}
-      <Box sx={{ bgcolor: 'primary.main', color: 'white', py: 6 }}>
+      <Box sx={{ bgcolor: '#0ea5e9', color: 'white', py: 6 }}>
         <Container maxWidth="md" sx={{ textAlign: 'center' }}>
           <Typography variant="h4" component="h2" gutterBottom sx={{
             fontWeight: 'bold'

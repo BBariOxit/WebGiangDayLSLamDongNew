@@ -9,6 +9,7 @@ const QuizResults = () => {
   const navigate = useNavigate();
   const result = location.state?.result || null;
   const quiz = location.state?.quiz || null;
+  const fromLesson = location.state?.fromLesson || null;
 
   if (!result || !quiz) {
     return (
@@ -241,15 +242,21 @@ const QuizResults = () => {
         <Button 
           variant="outlined" 
           startIcon={<Home />}
-          onClick={() => navigate('/quizzes')}
+          onClick={() => {
+            if (fromLesson) {
+              navigate(fromLesson);
+            } else {
+              navigate('/quizzes');
+            }
+          }}
           sx={{ minWidth: 160 }}
         >
-          Về danh sách
+          {fromLesson ? 'Quay lại bài học' : 'Về danh sách'}
         </Button>
         <Button 
           variant="contained" 
           startIcon={<Refresh />}
-          onClick={() => navigate(`/quizzes/take/${quiz.id}`)}
+          onClick={() => navigate(`/quizzes/take/${quiz.id}`, { state: { fromLesson } })}
           sx={{ 
             minWidth: 160,
             background: 'linear-gradient(135deg, #667eea, #764ba2)',

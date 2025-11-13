@@ -26,6 +26,61 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { listMyProgress } from '../api/lessonEngagementApi';
+
+const DEFAULT_RATING = 5;
+
+const clampProgress = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(Math.max(Math.round(numeric), 0), 100);
+};
+
+const parseLessonImages = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) =>
+        typeof item === 'string' ? { url: item, caption: '' } : item,
+      )
+      .filter((img) => img && typeof img.url === 'string');
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parseLessonImages(parsed);
+    } catch {
+      return [{ url: raw, caption: '' }];
+    }
+  }
+  if (typeof raw === 'object') {
+    return raw.url ? [raw] : [];
+  }
+  return [];
+};
+
+const formatRating = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_RATING;
+  return Math.round(numeric * 10) / 10;
+};
+
+const buildProgressMap = (rows = []) =>
+  new Map(
+    rows
+      .map((row) => {
+        const lessonId = Number(row.lesson_id);
+        if (!Number.isFinite(lessonId)) return null;
+        return [
+          lessonId,
+          {
+            progress: Number(row.progress ?? 0),
+            isCompleted: Boolean(row.is_completed ?? row.isCompleted),
+          },
+        ];
+      })
+      .filter(Boolean),
+  );
 
 const MyLearning = () => {
   const navigate = useNavigate();
@@ -43,34 +98,31 @@ const MyLearning = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const resLessons = await apiClient.get('/lessons?published=1');
+        setError('');
 
-        const payload = Array.isArray(resLessons.data) ? resLessons.data : resLessons.data?.data || [];
+        const lessonsPromise = apiClient.get('/lessons?published=1');
+        const progressPromise = user ? listMyProgress() : Promise.resolve([]);
+
+        const [lessonsRes, progressRows] = await Promise.all([lessonsPromise, progressPromise]);
+
+        if (!mounted) return;
+
+        const payload = Array.isArray(lessonsRes.data)
+          ? lessonsRes.data
+          : lessonsRes.data?.data || [];
+
+        const progressMap = buildProgressMap(progressRows);
+
         const normalized = (payload || []).map((lesson) => {
-          let parsedImages = [];
-          if (lesson.images) {
-            if (Array.isArray(lesson.images)) parsedImages = lesson.images;
-            else if (typeof lesson.images === 'string') {
-              try {
-                parsedImages = JSON.parse(lesson.images);
-              } catch {
-                parsedImages = [];
-              }
-            } else if (typeof lesson.images === 'object') parsedImages = lesson.images;
-          }
+          const lessonId = Number(lesson.lesson_id ?? lesson.id);
+          const progressState = progressMap.get(lessonId) || {};
+          const progressValue = clampProgress(progressState.progress ?? lesson.progress ?? 0);
+          const isCompleted = progressState.isCompleted || progressValue >= 100;
 
-          if (Array.isArray(parsedImages)) {
-            parsedImages = parsedImages.map((img) =>
-              typeof img === 'string' ? { url: img, caption: '' } : img,
-            );
-          }
-
-          const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
-          const hasRatings = ratingCount > 0 && lesson.rating !== null && lesson.rating !== undefined;
-          const ratingValue = hasRatings ? Math.round((lesson.rating || 0) * 10) / 10 : 5;
+          const ratingSource = lesson.avg_rating ?? lesson.rating ?? lesson.avgRating;
 
           return {
-            id: lesson.lesson_id ?? lesson.id,
+            id: lessonId,
             slug: lesson.slug,
             title: lesson.title,
             summary: lesson.summary || '',
@@ -78,21 +130,22 @@ const MyLearning = () => {
             duration: lesson.duration || '25 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
             category: lesson.category || 'Lịch sử địa phương',
-            rating: ratingValue,
-            ratingCount,
+            rating: formatRating(ratingSource),
+            ratingCount: Number(lesson.rating_count ?? lesson.ratingCount ?? 0),
             studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
-            progress: lesson.progress ?? 0,
-            status: lesson.progress === 0 ? 'not-started' : lesson.progress === 100 ? 'completed' : 'in-progress',
-            images: parsedImages,
+            progress: progressValue,
+            status: isCompleted ? 'completed' : progressValue > 0 ? 'in-progress' : 'not-started',
+            images: parseLessonImages(lesson.images),
             createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString(),
           };
         });
 
-        if (!mounted) return;
-
         setLessons(normalized);
       } catch (err) {
-        if (mounted) setError(err.message || 'Không thể tải dữ liệu bài học');
+        if (mounted) {
+          const message = err?.response?.data?.error || err?.message || 'Không thể tải dữ liệu bài học';
+          setError(message);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -102,7 +155,7 @@ const MyLearning = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [user]);
 
   // Filter lessons based on search and status
   const filteredLessons = useMemo(() => {
@@ -206,7 +259,7 @@ const MyLearning = () => {
             ].map((stat) => (
               <Card
                 key={stat.label}
-                className="group border border-slate-200 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl"
+                className="group border-2 border-slate-300 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-slate-400 hover:shadow-xl"
               >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
@@ -239,10 +292,10 @@ const MyLearning = () => {
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Tìm bài học..."
+                placeholder="Tìm kiếm bài học..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-all focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-all focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
               />
             </div>
             <Tabs
@@ -281,7 +334,7 @@ const MyLearning = () => {
         </div>
 
         {error && (
-          <Card className="mb-8 border border-rose-300 bg-rose-50">
+          <Card className="mb-8 border-2 border-rose-300 bg-rose-50">
             <CardContent className="py-4">
               <p className="text-sm font-medium text-rose-700">{error}</p>
             </CardContent>
@@ -294,7 +347,7 @@ const MyLearning = () => {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
+                className="animate-pulse space-y-3 rounded-2xl border-2 border-slate-300 bg-white p-4"
               >
                 <div className="h-40 rounded-xl bg-slate-200" />
                 <div className="h-4 w-3/4 rounded bg-slate-200" />
@@ -376,7 +429,7 @@ const LessonCard = ({ lesson, index, onOpen }) => {
   return (
     <button
       onClick={onOpen}
-      className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all duration-300 hover:-translate-y-2 hover:border-slate-300 hover:shadow-2xl"
+      className="group relative overflow-hidden rounded-2xl border-2 border-slate-300 bg-white transition-all duration-300 hover:-translate-y-2 hover:border-slate-400 hover:shadow-2xl"
       style={{
         animationDelay: `${index * 50}ms`,
         animation: 'fadeIn 0.5s ease-out forwards',
@@ -475,7 +528,7 @@ const LessonCard = ({ lesson, index, onOpen }) => {
           className="bg-white text-slate-900 opacity-0 transition-all duration-300 group-hover:opacity-100 hover:bg-slate-50"
         >
           <ArrowUpRight className="mr-2 h-4 w-4" />
-          {lesson.status === 'completed' ? 'Xem lại' : lesson.status === 'in-progress' ? 'Tiếp tục' : 'Bắt đầu'}
+          {lesson.status === 'completed' ? 'Ôn tập' : lesson.status === 'in-progress' ? 'Tiếp tục' : 'Bắt đầu'}
         </Button>
       </div>
     </button>

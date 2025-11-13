@@ -49,8 +49,8 @@ export async function submitQuizAttempt(lessonId, payload) {
   return res.data?.data;
 }
 
-export async function listQuizAttempts(lessonId) {
-  const res = await apiClient.get(`/lessons/${lessonId}/quiz-attempts`);
+export async function listQuizAttempts(quizId) {
+  const res = await apiClient.get(`/lessons/quiz/${quizId}/attempts`);
   return res.data?.data || [];
 }
 

@@ -63,6 +63,23 @@ export async function getQuizByLesson(lessonId) {
   return r.rows[0] || null;
 }
 
+export async function listQuizzesByLesson(lessonId) {
+  const r = await query('SELECT quiz_id FROM quizzes WHERE lesson_id=$1 ORDER BY quiz_id', [lessonId]);
+  return r.rows.map((row) => row.quiz_id);
+}
+
+export async function listQuizzesByLessons(lessonIds = []) {
+  if (!lessonIds?.length) return new Map();
+  const r = await query('SELECT lesson_id, quiz_id FROM quizzes WHERE lesson_id = ANY($1)', [lessonIds]);
+  const map = new Map();
+  r.rows.forEach(({ lesson_id, quiz_id }) => {
+    const key = Number(lesson_id);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(Number(quiz_id));
+  });
+  return map;
+}
+
 export async function listQuizQuestions(quizId) {
   const r = await query('SELECT * FROM quiz_questions WHERE quiz_id=$1 ORDER BY position, question_id', [quizId]);
   return r.rows;
@@ -76,6 +93,45 @@ export async function recordQuizAttempt({ quizId, userId, score, durationSeconds
 export async function listQuizAttempts(quizId, userId) {
   const r = await query('SELECT * FROM quiz_attempts WHERE quiz_id=$1 AND user_id=$2 ORDER BY attempt_id DESC LIMIT 20', [quizId, userId]);
   return r.rows;
+}
+
+export async function listPassedQuizzesForLesson({ lessonId, userId, passingScore }) {
+  const r = await query(
+    `
+      SELECT qa.quiz_id
+      FROM quiz_attempts qa
+      JOIN quizzes q ON q.quiz_id = qa.quiz_id
+      WHERE q.lesson_id = $1
+        AND qa.user_id = $2
+        AND qa.score >= $3
+      GROUP BY qa.quiz_id
+    `,
+    [lessonId, userId, passingScore],
+  );
+  return r.rows.map((row) => row.quiz_id);
+}
+
+export async function listPassedQuizzesForLessons({ lessonIds = [], userId, passingScore }) {
+  if (!lessonIds?.length) return new Map();
+  const r = await query(
+    `
+      SELECT q.lesson_id, qa.quiz_id
+      FROM quiz_attempts qa
+      JOIN quizzes q ON q.quiz_id = qa.quiz_id
+      WHERE q.lesson_id = ANY($1)
+        AND qa.user_id = $2
+        AND qa.score >= $3
+      GROUP BY q.lesson_id, qa.quiz_id
+    `,
+    [lessonIds, userId, passingScore],
+  );
+  const map = new Map();
+  r.rows.forEach(({ lesson_id, quiz_id }) => {
+    const key = Number(lesson_id);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(Number(quiz_id));
+  });
+  return map;
 }
 
 // BOOKMARKS

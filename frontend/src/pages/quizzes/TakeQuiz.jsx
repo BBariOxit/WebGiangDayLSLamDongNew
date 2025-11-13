@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@features/auth/hooks/useAuth';
 import { quizApi } from '../../api/quizApi';
 import {
@@ -28,6 +28,7 @@ const QUESTION_TYPE_LABEL = {
 const TakeQuiz = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   useAuth(); // ensure auth hook runs for protected routes
 
   const [quiz, setQuiz] = useState(null);
@@ -118,7 +119,7 @@ const TakeQuiz = () => {
       try {
         setSubmitting(true);
         const result = await quizApi.submitAttemptByQuizId(quiz.id, buildPayloadAnswers());
-        navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz } });
+        navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz, fromLesson: location.state?.fromLesson || null } });
       } catch (err) {
         setError(err.message || 'Nộp bài thất bại');
         setSubmitting(false);
@@ -227,7 +228,7 @@ const TakeQuiz = () => {
     try {
       setSubmitting(true);
       const result = await quizApi.submitAttemptByQuizId(quiz.id, buildPayloadAnswers());
-      navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz } });
+      navigate(`/quizzes/results/${quiz.id}`, { state: { result, quiz, fromLesson: location.state?.fromLesson || null } });
     } catch (err) {
       setError(err.message || 'Nộp bài thất bại');
       setSubmitting(false);
