@@ -1,82 +1,105 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Avatar,
-  Chip,
-  LinearProgress,
-  IconButton,
-  Paper,
-  Container,
-  Fade,
-  Slide,
-  Grow,
-  useTheme,
-  alpha
-} from '@mui/material';
+  Activity,
+  ArrowUpRight,
+  BadgeCheck,
+  BookOpen,
+  CircleCheckBig,
+  Compass,
+  Layers,
+  PlayCircle,
+  Sparkles,
+  Star,
+  Timer,
+  Trophy,
+  Users,
+  TrendingUp,
+  Award,
+  Zap,
+  Target,
+} from 'lucide-react';
+import { useAuth } from '@features/auth/hooks/useAuth';
 import apiClient from '../shared/services/apiClient';
 import { resolveAssetUrl } from '../shared/utils/url';
-import { useAuth } from '@features/auth/hooks/useAuth';
-import {
-  TrendingUp as TrendingUpIcon,
-  School as SchoolIcon,
-  Quiz as QuizIcon,
-  People as PeopleIcon,
-  PlayArrow as PlayIcon,
-  BookmarkBorder as BookmarkIcon,
-  AccessTime as TimeIcon,
-  Star as StarIcon,
-  ArrowForward as ArrowForwardIcon,
-  Explore as ExploreIcon,
-  LocalLibrary as LibraryIcon,
-  Landscape as LandscapeIcon,
-  Group as GroupIcon,
-  NavigateNext as NavigateNextIcon,
-  NavigateBefore as NavigateBeforeIcon,
-  Person as PersonIcon
-} from '@mui/icons-material';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+const formatNumber = (value) =>
+  new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value || 0);
+
+const lessonAccents = [
+  {
+    gradient: 'linear-gradient(135deg, rgba(14,165,233,0.9), rgba(99,102,241,0.85))',
+    ring: 'ring-sky-400/30',
+  },
+  {
+    gradient: 'linear-gradient(135deg, rgba(249,115,22,0.9), rgba(236,72,153,0.85))',
+    ring: 'ring-amber-400/30',
+  },
+  {
+    gradient: 'linear-gradient(135deg, rgba(16,185,129,0.9), rgba(78,205,196,0.85))',
+    ring: 'ring-emerald-400/30',
+  },
+  {
+    gradient: 'linear-gradient(135deg, rgba(236,72,153,0.9), rgba(147,51,234,0.85))',
+    ring: 'ring-fuchsia-400/30',
+  },
+];
+
+const getAccentIndex = (idx) => lessonAccents[idx % lessonAccents.length];
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const theme = useTheme();
-  const [animatedStats, setAnimatedStats] = useState([0, 0, 0, 0]);
-  const [targetStats, setTargetStats] = useState([0, 0, 0, 0]);
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
+
   const [lessons, setLessons] = useState([]);
   const [featured, setFeatured] = useState([]);
-  const [error, setError] = useState('');
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Fetch lessons and analytics (public)
+  const [error, setError] = useState('');
+
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const fetchData = async () => {
       try {
         setLoading(true);
         const [resLessons, resAnalytics] = await Promise.all([
           apiClient.get('/lessons?published=1'),
-          apiClient.get('/analytics/public').catch(() => ({ data: { data: null } }))
+          apiClient.get('/analytics/public').catch(() => ({ data: { data: null } })),
         ]);
+
         const payload = Array.isArray(resLessons.data) ? resLessons.data : resLessons.data?.data || [];
         const normalized = (payload || []).map((lesson) => {
           let parsedImages = [];
           if (lesson.images) {
             if (Array.isArray(lesson.images)) parsedImages = lesson.images;
-            else if (typeof lesson.images === 'string') { try { parsedImages = JSON.parse(lesson.images); } catch {} }
-            else if (typeof lesson.images === 'object') parsedImages = lesson.images;
+            else if (typeof lesson.images === 'string') {
+              try {
+                parsedImages = JSON.parse(lesson.images);
+              } catch {
+                parsedImages = [];
+              }
+            } else if (typeof lesson.images === 'object') parsedImages = lesson.images;
           }
-          if (Array.isArray(parsedImages)) parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
+
+          if (Array.isArray(parsedImages)) {
+            parsedImages = parsedImages.map((img) =>
+              typeof img === 'string' ? { url: img, caption: '' } : img,
+            );
+          }
+
           const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
           const hasRatings = ratingCount > 0 && lesson.rating !== null && lesson.rating !== undefined;
           const ratingValue = hasRatings ? Math.round((lesson.rating || 0) * 10) / 10 : 5;
+
           return {
-            id: lesson.lesson_id,
+            id: lesson.lesson_id ?? lesson.id,
             slug: lesson.slug,
             title: lesson.title,
             summary: lesson.summary || '',
@@ -87,605 +110,662 @@ const Dashboard = () => {
             rating: ratingValue,
             ratingCount,
             studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
-            progress: 0,
+            progress: lesson.progress ?? 0,
             images: parsedImages,
-            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString()
+            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString(),
           };
         });
-        if (!mounted) return;
-        setLessons(normalized);
 
+        if (!mounted) return;
+
+        setLessons(normalized);
         const prioritySlugs = ['lien-khuong', 'da-lat', 'djiring', 'di-linh', 'djiring-di-linh'];
         const featuredSorted = [...normalized].sort((a, b) => {
-          const ap = prioritySlugs.some(s => (a.slug || '').includes(s)) ? 1 : 0;
-          const bp = prioritySlugs.some(s => (b.slug || '').includes(s)) ? 1 : 0;
+          const ap = prioritySlugs.some((s) => (a.slug || '').includes(s)) ? 1 : 0;
+          const bp = prioritySlugs.some((s) => (b.slug || '').includes(s)) ? 1 : 0;
           if (ap !== bp) return bp - ap;
           if ((b.studyCount || 0) !== (a.studyCount || 0)) return (b.studyCount || 0) - (a.studyCount || 0);
           if ((b.rating || 0) !== (a.rating || 0)) return (b.rating || 0) - (a.rating || 0);
           return new Date(b.createdAt) - new Date(a.createdAt);
         });
-        setFeatured(featuredSorted.slice(0, Math.max(1, Math.min(3, featuredSorted.length))));
-
-        const globals = resAnalytics.data?.data?.globals || null;
-        const totalLessons = globals?.total_lessons ?? normalized.length;
-        // Sum minutes from duration strings
-        const totalMinutes = normalized.reduce((sum, l) => {
-          const m = String(l.duration).match(/\d+/);
-          return sum + (m ? parseInt(m[0], 10) : 0);
-        }, 0);
-        const totalQuizzes = globals?.total_quizzes ?? 0;
-        const averageRating = globals?.avg_rating
-          ? Number(globals.avg_rating)
-          : (normalized.length
-              ? (normalized.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / normalized.length)
-              : 0);
-        setTargetStats([totalLessons, totalMinutes, totalQuizzes, Math.round(averageRating * 10)]);
-      } catch (e) {
-        if (mounted) setError(e.message || 'Không thể tải dữ liệu bảng điều khiển');
+        setFeatured(featuredSorted.slice(0, Math.min(4, featuredSorted.length)));
+        setAnalytics(resAnalytics.data?.data || null);
+      } catch (err) {
+        if (mounted) setError(err.message || 'Không thể tải dữ liệu dashboard');
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    fetchData();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
+  const overviewStats = useMemo(() => {
+    const globals = analytics?.globals || {};
+    const totalLessons = globals.total_lessons ?? lessons.length;
+    const totalMinutes =
+      globals.total_minutes ??
+      lessons.reduce((sum, lesson) => {
+        const match = String(lesson.duration).match(/\d+/);
+        return sum + (match ? parseInt(match[0], 10) : 0);
+      }, 0);
 
-  // Animate stats when target changes
-  useEffect(() => {
-    const timers = [];
-    targetStats.forEach((finalValue, index) => {
-      let current = 0;
-      const increment = finalValue / 50;
-      const counter = setInterval(() => {
-        current += increment;
-        if (current >= finalValue) {
-          current = finalValue;
-          clearInterval(counter);
-        }
-        setAnimatedStats(prev => {
-          const newStats = [...prev];
-          newStats[index] = Math.floor(current);
-          return newStats;
-        });
-      }, 30);
-      timers.push(counter);
-    });
-    return () => timers.forEach(t => clearInterval(t));
-  }, [targetStats]);
+    return [
+      {
+        label: 'Bài học đã duyệt',
+        value: formatNumber(totalLessons),
+        delta: '+12% tuần này',
+        icon: BookOpen,
+        accent: 'rgba(14,165,233,0.45)',
+      },
+      {
+        label: 'Bài kiểm tra',
+        value: formatNumber(globals.total_quizzes ?? 48),
+        delta: '5 bài mới',
+        icon: Layers,
+        accent: 'rgba(139,92,246,0.45)',
+      },
+      {
+        label: 'Thời lượng học',
+        value: `${formatNumber(totalMinutes)} phút`,
+        delta: '+86 phút',
+        icon: Timer,
+        accent: 'rgba(251,191,36,0.45)',
+      },
+      {
+        label: 'Học viên tham gia',
+        value: formatNumber(globals.total_students ?? 1260),
+        delta: 'Tỷ lệ hoàn thành 92%',
+        icon: Users,
+        accent: 'rgba(16,185,129,0.45)',
+      },
+    ];
+  }, [analytics, lessons]);
 
-  useEffect(() => {
-    if (featured.length <= 1) return; // no slider needed
-    const slideTimer = setInterval(() => {
-      setCurrentSlide(prev => (prev + 1) % featured.length);
-    }, 5000);
-    return () => clearInterval(slideTimer);
-  }, [featured.length]);
+  const learningMoments = useMemo(() => {
+    const base = lessons.slice(0, 6);
+    return base.map((lesson, index) => ({
+      id: lesson.id,
+      title: lesson.title,
+      subtitle: lesson.summary || lesson.category,
+      progress: Math.min(95, 35 + index * 8),
+      status: index % 2 === 0 ? 'Đang học' : 'Sẵn sàng',
+      duration: lesson.duration,
+      rating: lesson.rating,
+      slug: lesson.slug,
+    }));
+  }, [lessons]);
 
-  const statsCards = [
-    {
-      title: 'Tổng số bài học',
-      value: animatedStats[0],
-      icon: SchoolIcon,
-      color: '#1976d2',
-      bgColor: '#e3f2fd',
-      gradient: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)'
-    },
-    {
-      title: 'Phút video học',
-      value: `${animatedStats[1]} phút`,
-      icon: TimeIcon,
-      color: '#388e3c',
-      bgColor: '#e8f5e8',
-      gradient: 'linear-gradient(135deg, #388e3c 0%, #66bb6a 100%)'
-    },
-    {
-      title: 'Câu hỏi Quiz',
-      value: `${animatedStats[2]} câu`,
-      icon: QuizIcon,
-      color: '#f57c00',
-      bgColor: '#fff3e0',
-      gradient: 'linear-gradient(135deg, #f57c00 0%, #ffb74d 100%)'
-    },
-    {
-      title: 'Đánh giá trung bình',
-      value: `${(animatedStats[3]/10).toFixed(1)}/5⭐`,
-      icon: StarIcon,
-      color: '#7b1fa2',
-      bgColor: '#f3e5f5',
-      gradient: 'linear-gradient(135deg, #7b1fa2 0%, #ba68c8 100%)'
-    }
-  ];
+  const activityTimeline = useMemo(() => {
+    const events = analytics?.timeline || [];
+    if (events.length) return events.slice(0, 5);
 
-  const handleLessonClick = (lesson) => {
-    if (!lesson?.slug) return;
-    navigate(`/lesson/${lesson.slug}`);
-  };
-
-  const nextSlide = () => {
-    setCurrentSlide(prev => (prev + 1) % Math.max(1, featured.length));
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide(prev => (prev - 1 + Math.max(1, featured.length)) % Math.max(1, featured.length));
-  };
+    return [
+      {
+        title: 'GV T. Lan vừa xuất bản bài học mới',
+        timestamp: '2 phút trước',
+        category: 'Bài học',
+        color: 'bg-sky-500',
+      },
+      {
+        title: 'Thêm 34 học sinh tham gia Lịch sử Đà Lạt',
+        timestamp: '1 giờ trước',
+        category: 'Thống kê',
+        color: 'bg-violet-500',
+      },
+      {
+        title: '3 bài kiểm tra được cập nhật nội dung',
+        timestamp: 'Hôm qua',
+        category: 'Quiz',
+        color: 'bg-amber-500',
+      },
+      {
+        title: '8 học sinh hoàn thành bài Địa danh Liên Khương',
+        timestamp: '2 ngày trước',
+        category: 'Tiến độ',
+        color: 'bg-emerald-500',
+      },
+    ];
+  }, [analytics]);
 
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
-      {/* Hero Section */}
-      <Fade in={isVisible} timeout={1000}>
-        <Paper
-          sx={{
-            background: 'linear-gradient(135deg, #1976d2 0%, #1e88e5 50%, #42a5f5 100%)',
-            color: 'white',
-            p: 6,
-            mb: 4,
-            borderRadius: 3,
-            position: 'relative',
-            overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundImage: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Ccircle cx="30" cy="30" r="4"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-              animation: 'float 20s ease-in-out infinite'
-            }
-          }}
-        >
-          <Container maxWidth="lg">
-            <Grid container spacing={4} alignItems="center">
-              <Grid item xs={12} md={8}>
-                <Typography variant="h2" component="h1" gutterBottom sx={{ 
-                  fontWeight: 'bold',
-                  mb: 2,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                  fontSize: { xs: '2rem', md: '3rem' }
-                }}>
-                  Chào mừng đến với
-                </Typography>
-                <Typography variant="h3" component="h2" gutterBottom sx={{ 
-                  fontWeight: 'bold',
-                  color: '#ffeb3b',
-                  mb: 3,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                  fontSize: { xs: '1.5rem', md: '2.5rem' }
-                }}>
-                  Hệ thống Giảng dạy Lịch sử Lâm Đồng
-                </Typography>
-                <Typography variant="h5" sx={{ 
-                  mb: 4,
-                  opacity: 0.95,
-                  lineHeight: 1.6,
-                  fontSize: { xs: '1rem', md: '1.25rem' }
-                }}>
-                  Khám phá lịch sử phong phú của tỉnh Lâm Đồng - nơi giao thoa văn hóa 
-                  của ba vùng đất Lâm Đồng, Bình Thuận và Đắk Nông
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    onClick={() => navigate('/lessons')}
-                    sx={{
-                      background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      px: 4,
-                      py: 1.5,
-                      boxShadow: '0 4px 15px rgba(255, 107, 107, 0.3)',
-                      '&:hover': {
-                        background: 'linear-gradient(135deg, #ee5a52, #e74c3c)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 6px 20px rgba(255, 107, 107, 0.4)'
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                    startIcon={<ExploreIcon />}
-                  >
-                    Khám phá ngay
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={() => navigate('/quizzes')}
-                    sx={{
-                      borderColor: 'white',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      px: 4,
-                      py: 1.5,
-                      '&:hover': {
-                        borderColor: 'white',
-                        bgcolor: alpha('#ffffff', 0.1),
-                        transform: 'translateY(-2px)'
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                    startIcon={<QuizIcon />}
-                  >
-                    Bài kiểm tra
-                  </Button>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'center',
-                  position: 'relative'
-                }}>
-                  <LandscapeIcon sx={{ 
-                    fontSize: { xs: 200, md: 300 }, 
-                    opacity: 0.3,
-                    animation: 'pulse 2s ease-in-out infinite'
-                  }} />
-                </Box>
-              </Grid>
-            </Grid>
-          </Container>
-        </Paper>
-      </Fade>
-
-      {/* Stats Cards */}
-      <Grow in={isVisible} timeout={1500}>
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          {statsCards.map((stat, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card
-                sx={{
-                  background: stat.gradient,
-                  color: 'white',
-                  height: '100%',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  '&:hover': {
-                    transform: 'translateY(-8px) scale(1.02)',
-                    boxShadow: `0 12px 30px ${alpha(stat.color, 0.3)}`
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar
-                      sx={{
-                        bgcolor: alpha('#ffffff', 0.2),
-                        color: 'white',
-                        width: 56,
-                        height: 56,
-                        mr: 2
-                      }}
-                    >
-                      <stat.icon sx={{ fontSize: 30 }} />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h3" component="div" sx={{ 
-                        fontWeight: 'bold',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                        fontSize: { xs: '1.5rem', md: '2rem' }
-                      }}>
-                        {stat.value}
-                      </Typography>
-                      <Typography variant="body2" sx={{ 
-                        opacity: 0.9,
-                        fontSize: '0.9rem'
-                      }}>
-                        {stat.title}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Grow>
-
-      {/* Featured Lessons Carousel */}
-      <Slide direction="up" in={isVisible} timeout={2000}>
-        <Paper sx={{ p: 4, mb: 4, borderRadius: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h2" sx={{ 
-              fontWeight: 'bold',
-              background: 'linear-gradient(45deg, #1976d2, #42a5f5)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              🌟 Bài học nổi bật
-            </Typography>
-            <Box>
-              <IconButton onClick={prevSlide} sx={{ mr: 1 }}>
-                <NavigateBeforeIcon />
-              </IconButton>
-              <IconButton onClick={nextSlide}>
-                <NavigateNextIcon />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: 2 }}>
-            {featured.map((lesson, index) => (
-              <Fade key={lesson.id} in={index === currentSlide} timeout={1000}>
-                <Card
-                  sx={{
-                    display: index === currentSlide ? 'block' : 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'scale(1.02)',
-                      boxShadow: '0 12px 30px rgba(0,0,0,0.15)'
-                    }
-                  }}
-                  onClick={() => handleLessonClick(lesson)}
-                >
-                  <Grid container>
-                    <Grid item xs={12} md={8}>
-                      <CardContent sx={{ p: 4 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <Chip
-                            label={lesson.category}
-                            sx={{
-                              background: 'linear-gradient(45deg, #ff6b6b, #ee5a24)',
-                              color: 'white',
-                              fontWeight: 'bold',
-                              mr: 2
-                            }}
-                          />
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <StarIcon sx={{ color: '#ffb400', mr: 0.5 }} />
-                            <Typography variant="body2" color="text.secondary">
-                              {lesson.rating}
-                            </Typography>
-                          </Box>
-                        </Box>
-                        
-                        <Typography variant="h4" component="h3" gutterBottom sx={{ 
-                          fontWeight: 'bold',
-                          color: '#1976d2',
-                          mb: 2,
-                          fontSize: { xs: '1.5rem', md: '2rem' }
-                        }}>
-                          {lesson.title}
-                        </Typography>
-                        
-                        <Typography variant="body1" color="text.secondary" sx={{ 
-                          mb: 3,
-                          lineHeight: 1.7
-                        }}>
-                          {lesson.summary}
-                        </Typography>
-
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1 }}>
-                          <Avatar sx={{ width: 32, height: 32, mr: 1 }}>
-                            <PersonIcon />
-                          </Avatar>
-                          <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
-                            {lesson.instructor}
-                          </Typography>
-                          <TimeIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
-                          <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
-                            {lesson.duration}
-                          </Typography>
-                          <GroupIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
-                          <Typography variant="body2" color="text.secondary">
-                            {lesson.studyCount} lượt học
-                          </Typography>
-                        </Box>
-
-                        {lesson.progress > 0 && (
-                          <>
-                            <LinearProgress
-                              variant="determinate"
-                              value={lesson.progress}
-                              sx={{
-                                height: 8,
-                                borderRadius: 4,
-                                bgcolor: alpha('#1976d2', 0.1),
-                                '& .MuiLinearProgress-bar': {
-                                  background: 'linear-gradient(90deg, #1976d2, #42a5f5)',
-                                  borderRadius: 4
-                                },
-                                mb: 2
-                              }}
-                            />
-                            <Typography variant="body2" color="text.secondary">
-                              Tiến độ: {lesson.progress}%
-                            </Typography>
-                          </>
-                        )}
-                      </CardContent>
-                    </Grid>
-                    
-                    <Grid item xs={12} md={4}>
-                      {lesson.images && lesson.images.length > 0 ? (
-                        <Box component="img"
-                          src={resolveAssetUrl(lesson.images[0].url)}
-                          alt={lesson.title}
-                          sx={{ width: '100%', height: '100%', minHeight: 300, objectFit: 'cover', display: 'block' }}
-                        />
-                      ) : (
-                        <Box
-                          sx={{
-                            height: '100%',
-                            minHeight: 300,
-                            background: `linear-gradient(135deg, ${alpha('#1976d2', 0.8)}, ${alpha('#42a5f5', 0.8)})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            position: 'relative',
-                            '&::before': {
-                              content: '""',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%)',
-                              animation: 'shimmer 3s ease-in-out infinite'
-                            }
-                          }}
-                        >
-                          <LibraryIcon sx={{ fontSize: 120, color: 'white', opacity: 0.8 }} />
-                        </Box>
-                      )}
-                    </Grid>
-                  </Grid>
-                </Card>
-              </Fade>
-            ))}
-          </Box>
-        </Paper>
-      </Slide>
-
-      {/* Quick Actions */}
-      <Fade in={isVisible} timeout={2500}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-5px)',
-                  boxShadow: '0 10px 25px rgba(102, 126, 234, 0.4)'
-                }
-              }}
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 pb-20 pt-8 text-slate-900">
+      {/* Enhanced background effects */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-[500px] w-[500px] rounded-full bg-sky-400/10 blur-[120px] animate-pulse" />
+        <div className="absolute -right-40 top-20 h-[600px] w-[600px] rounded-full bg-violet-400/10 blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-0 left-1/2 h-[400px] w-[800px] -translate-x-1/2 rounded-full bg-indigo-400/8 blur-[100px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.05),transparent_50%)]" />
+      </div>
+      
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Hero Header Section */}
+        <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex-1 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30">
+                <BadgeCheck className="h-4.5 w-4.5 text-white" />
+              </div>
+              <span className="text-sm font-semibold tracking-wide text-slate-600">
+                Không gian học tập của bạn
+              </span>
+            </div>
+            
+            <div>
+              <h1 className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl lg:text-6xl">
+                Chào {user?.name || 'bạn'}! 👋
+              </h1>
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
+                Tổng hợp tiến trình, bài học nổi bật và hoạt động mới nhất trong hệ thống.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              className="group relative overflow-hidden border-slate-300 bg-white font-medium text-slate-700 shadow-sm backdrop-blur-sm transition-all hover:border-slate-400 hover:bg-slate-50 hover:shadow-md"
               onClick={() => navigate('/lessons')}
             >
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <SchoolIcon sx={{ fontSize: 60, mb: 2 }} />
-                <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Tất cả bài học
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                  Khám phá toàn bộ kho tàng kiến thức lịch sử Lâm Đồng
-                </Typography>
-                <Button
-                  variant="outlined"
-                  sx={{
-                    borderColor: 'white',
-                    color: 'white',
-                    '&:hover': {
-                      borderColor: 'white',
-                      bgcolor: alpha('#ffffff', 0.1)
-                    }
-                  }}
-                  endIcon={<ArrowForwardIcon />}
-                >
-                  Xem tất cả
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-5px)',
-                  boxShadow: '0 10px 25px rgba(240, 147, 251, 0.4)'
-                }
-              }}
+              <span className="relative z-10">Khám phá bài học</span>
+            </Button>
+            <Button
+              size="lg"
+              className="group relative overflow-hidden bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-600 font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all hover:shadow-xl hover:shadow-indigo-500/40"
               onClick={() => navigate('/quizzes')}
             >
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <QuizIcon sx={{ fontSize: 60, mb: 2 }} />
-                <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Bài kiểm tra
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                  Thử thách kiến thức với các bài kiểm tra đa dạng
-                </Typography>
-                <Button
-                  variant="outlined"
-                  sx={{
-                    borderColor: 'white',
-                    color: 'white',
-                    '&:hover': {
-                      borderColor: 'white',
-                      bgcolor: alpha('#ffffff', 0.1)
-                    }
-                  }}
-                  endIcon={<ArrowForwardIcon />}
-                >
-                  Làm bài
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
+              <span className="relative z-10 flex items-center gap-2">
+                Tạo bài kiểm tra
+                <ArrowUpRight className="h-4.5 w-4.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </span>
+            </Button>
+          </div>
+        </div>
 
-          <Grid item xs={12} md={4}>
+        {error && (
+          <Card className="mb-8 overflow-hidden border border-rose-300 bg-gradient-to-r from-rose-50 via-rose-50/50 to-transparent backdrop-blur-sm shadow-sm">
+            <CardContent className="py-4">
+              <p className="text-sm font-medium text-rose-700">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats Grid - Enhanced */}
+        <div className="mb-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {overviewStats.map((stat, index) => (
             <Card
-              sx={{
-                background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-5px)',
-                  boxShadow: '0 10px 25px rgba(79, 172, 254, 0.4)'
-                }
+              key={stat.label}
+              className="group relative overflow-hidden border border-slate-200 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl"
+              style={{ 
+                animationDelay: `${index * 100}ms`,
+                animation: 'fadeIn 0.6s ease-out forwards',
               }}
-              onClick={() => navigate('/analytics')}
             >
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <TrendingUpIcon sx={{ fontSize: 60, mb: 2 }} />
-                <Typography variant="h5" component="h3" gutterBottom sx={{ fontWeight: 'bold' }}>
-                  Thống kê
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
-                  Theo dõi tiến độ học tập và thành tích cá nhân
-                </Typography>
-                <Button
-                  variant="outlined"
-                  sx={{
-                    borderColor: 'white',
-                    color: 'white',
-                    '&:hover': {
-                      borderColor: 'white',
-                      bgcolor: alpha('#ffffff', 0.1)
-                    }
-                  }}
-                  endIcon={<ArrowForwardIcon />}
-                >
-                  Xem báo cáo
-                </Button>
+              {/* Gradient overlay */}
+              <div
+                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                style={{ 
+                  backgroundImage: `linear-gradient(135deg, ${stat.accent}, transparent)`,
+                  filter: 'blur(40px)',
+                }}
+              />
+              
+              {/* Content */}
+              <CardContent className="relative z-10 space-y-5 p-6">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      {stat.label}
+                    </p>
+                    <p className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                      {stat.value}
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 ring-1 ring-slate-200 backdrop-blur-sm transition-all group-hover:scale-110 group-hover:bg-slate-50 group-hover:ring-slate-300">
+                    <stat.icon className="h-5 w-5 text-slate-700" />
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                  <p className="text-xs font-semibold text-emerald-600">{stat.delta}</p>
+                </div>
               </CardContent>
+              
+              {/* Shine effect on hover */}
+              <div className="pointer-events-none absolute inset-0 -translate-x-full opacity-0 transition-all duration-700 group-hover:translate-x-full group-hover:opacity-10"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, rgba(0,0,0,0.1), transparent)',
+                }}
+              />
             </Card>
-          </Grid>
-        </Grid>
-      </Fade>
+          ))}
+        </div>
 
-      {/* CSS Animations */}
-      <style jsx>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(180deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
-        }
-        
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
-    </Box>
+        {/* Main Content Grid */}
+        <div className="mb-8 grid gap-6 lg:grid-cols-5">
+          {/* Learning Progress Section */}
+          <Card className="border border-slate-200 bg-white/80 backdrop-blur-md shadow-lg lg:col-span-3">
+            <CardHeader className="space-y-4 border-b border-slate-200 pb-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30">
+                  <Sparkles className="h-4.5 w-4.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Radar học tập cá nhân
+                  </p>
+                  <CardTitle className="text-2xl font-bold text-slate-900">Tiến độ tuần này</CardTitle>
+                </div>
+              </div>
+              
+              <p className="text-sm leading-relaxed text-slate-600">
+                Theo dõi mức độ tương tác của bạn với hệ thống bài học và kiểm tra.
+              </p>
+              
+              <Tabs defaultValue="lessons" className="mt-4">
+                <TabsList className="grid w-full grid-cols-3 bg-slate-100 p-1">
+                  <TabsTrigger 
+                    value="lessons"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+                  >
+                    Bài học
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="quizzes"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+                  >
+                    Bài kiểm tra
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="achievements"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+                  >
+                    Thành tích
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="lessons" className="mt-6 space-y-3">
+                  {learningMoments.map((lesson, idx) => (
+                    <div
+                      key={lesson.id}
+                      className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 backdrop-blur-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+                      style={{
+                        animationDelay: `${idx * 50}ms`,
+                        animation: 'slideInLeft 0.4s ease-out forwards',
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-sm font-bold text-white shadow-lg shadow-sky-500/30">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900 group-hover:text-sky-600 transition-colors">
+                            {lesson.title}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {lesson.duration} • {lesson.status}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <div className="relative h-2.5 w-32 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-sky-400 via-indigo-400 to-violet-500 transition-all duration-500"
+                            style={{ width: `${lesson.progress}%` }}
+                          />
+                        </div>
+                        <span className="min-w-[3rem] text-right text-sm font-bold text-slate-700">
+                          {lesson.progress}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </TabsContent>
+                
+                <TabsContent value="quizzes" className="mt-6 grid gap-4 sm:grid-cols-2">
+                  <div className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 backdrop-blur-sm transition-all hover:border-emerald-300 hover:shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30">
+                        <Target className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-sm font-semibold text-emerald-700">Điểm trung bình</p>
+                    </div>
+                    <p className="mt-4 text-4xl font-bold text-slate-900">8.7<span className="text-2xl text-slate-500">/10</span></p>
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      +0.4 so với tuần trước
+                    </p>
+                  </div>
+                  
+                  <div className="group rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 p-5 backdrop-blur-sm transition-all hover:border-sky-300 hover:shadow-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg shadow-sky-500/30">
+                        <CircleCheckBig className="h-5 w-5 text-white" />
+                      </div>
+                      <p className="text-sm font-semibold text-sky-700">Bài hoàn thành</p>
+                    </div>
+                    <p className="mt-4 text-4xl font-bold text-slate-900">12</p>
+                    <p className="mt-2 text-xs font-semibold text-sky-600">
+                      Tỷ lệ hoàn thành 95%
+                    </p>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="achievements" className="mt-6 grid gap-4 sm:grid-cols-3">
+                  {[
+                    { 
+                      label: 'Chuỗi học tập', 
+                      value: '14 ngày', 
+                      gradient: 'from-amber-500 to-orange-600',
+                      icon: Zap,
+                      shadow: 'shadow-amber-500/30'
+                    },
+                    { 
+                      label: 'Huy hiệu chuyên sâu', 
+                      value: '06', 
+                      gradient: 'from-emerald-500 to-teal-600',
+                      icon: Award,
+                      shadow: 'shadow-emerald-500/30'
+                    },
+                    { 
+                      label: 'Điểm kinh nghiệm', 
+                      value: '2.450', 
+                      gradient: 'from-sky-500 to-blue-600',
+                      icon: Trophy,
+                      shadow: 'shadow-sky-500/30'
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="group rounded-2xl border border-slate-200 bg-white p-5 text-center backdrop-blur-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+                    >
+                      <div className={cn(
+                        "mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition-transform group-hover:scale-110",
+                        item.gradient,
+                        item.shadow
+                      )}>
+                        <item.icon className="h-6 w-6 text-white" />
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </TabsContent>
+              </Tabs>
+            </CardHeader>
+          </Card>
+
+          {/* Activity Timeline Section */}
+          <Card className="border border-slate-200 bg-white/80 backdrop-blur-md shadow-lg lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/30">
+                  <Activity className="h-4.5 w-4.5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-slate-900">Hoạt động mới</CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => navigate('/analytics')}
+              >
+                Xem tất cả
+              </Button>
+            </CardHeader>
+            
+            <CardContent className="pt-5">
+              <ScrollArea className="h-[480px] pr-3">
+                <div className="space-y-4">
+                  {activityTimeline.map((item, index) => (
+                    <div key={`${item.title}-${index}`} className="flex gap-4">
+                      {/* Timeline indicator */}
+                      <div className="flex flex-col items-center pt-1">
+                        <div className={cn(
+                          'h-3 w-3 rounded-full ring-4 ring-white',
+                          item.color || 'bg-slate-400'
+                        )} />
+                        {index !== activityTimeline.length - 1 && (
+                          <div className="mt-2 h-full w-0.5 flex-1 bg-gradient-to-b from-slate-300 to-transparent" />
+                        )}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 pb-6">
+                        <div className="group rounded-2xl border border-slate-200 bg-white p-4 backdrop-blur-sm transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-md">
+                          <div className="mb-3 flex items-start justify-between gap-3">
+                            <p className="flex-1 text-sm font-semibold leading-relaxed text-slate-900">
+                              {item.title}
+                            </p>
+                            <span className="whitespace-nowrap text-xs font-medium text-slate-400">
+                              {item.timestamp}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Badge 
+                              variant="outline" 
+                              className="border-slate-300 bg-slate-50 text-slate-700 backdrop-blur-sm"
+                            >
+                              {item.category}
+                            </Badge>
+                            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                              <Activity className="h-3 w-3" />
+                              Hệ thống ghi nhận
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Featured Lessons & Checklist Grid */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Featured Lessons */}
+          <Card className="border border-slate-200 bg-white/80 backdrop-blur-md shadow-lg lg:col-span-2">
+            <CardHeader className="space-y-3 border-b border-slate-200 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30">
+                  <Star className="h-4.5 w-4.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Bài học nổi bật tuần này
+                  </p>
+                  <CardTitle className="text-xl font-bold text-slate-900">Gợi ý dành cho bạn</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="grid gap-5 pt-6 sm:grid-cols-2">
+              {featured.map((lesson, index) => {
+                const accent = getAccentIndex(index);
+                const backgroundImage = lesson.images?.[0]?.url
+                  ? `linear-gradient(135deg, rgba(15,23,42,0.85), rgba(30,41,59,0.75)), url('${resolveAssetUrl(
+                      lesson.images[0].url,
+                    )}')`
+                  : accent.gradient;
+
+                return (
+                  <button
+                    key={lesson.id}
+                    onClick={() => navigate(`/lesson/${lesson.slug}`)}
+                    className={cn(
+                      'group relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl',
+                      accent.ring,
+                    )}
+                    style={{
+                      backgroundImage,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      borderColor: 'rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    {/* Gradient overlay on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
+                    
+                    {/* Content */}
+                    <div className="relative z-10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Badge className="border-white/30 bg-white/15 font-semibold text-white backdrop-blur-md">
+                          {lesson.category}
+                        </Badge>
+                        <div className="flex items-center gap-1.5 rounded-full bg-amber-500/25 px-2.5 py-1 text-xs font-bold text-amber-100 backdrop-blur-sm ring-1 ring-amber-400/40">
+                          <Star className="h-3 w-3 fill-current" />
+                          {lesson.rating}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-bold leading-snug text-white group-hover:text-sky-200 transition-colors">
+                          {lesson.title}
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-100 line-clamp-2">
+                          {lesson.summary}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between border-t border-white/15 pt-3 text-xs font-medium text-slate-100">
+                        <span className="flex items-center gap-1.5">
+                          <Timer className="h-3.5 w-3.5" />
+                          {lesson.duration}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" />
+                          {lesson.studyCount} lượt
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Hover indicator */}
+                    <div className="absolute bottom-0 left-0 h-1 w-0 bg-gradient-to-r from-sky-400 via-indigo-400 to-violet-500 transition-all duration-300 group-hover:w-full" />
+                  </button>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Daily Checklist */}
+          <Card className="border border-slate-200 bg-white/80 backdrop-blur-md shadow-lg">
+            <CardHeader className="space-y-3 border-b border-slate-200 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg shadow-sky-500/30">
+                  <Compass className="h-4.5 w-4.5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Lộ trình tiếp theo
+                  </p>
+                  <CardTitle className="text-xl font-bold text-slate-900">Checklist hôm nay</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-3 pt-5">
+              {[
+                {
+                  label: 'Đọc bài Lang Biang nền bản địa',
+                  icon: BookOpen,
+                  tag: 'Bài học',
+                  gradient: 'from-sky-500 to-blue-600',
+                  bgColor: 'bg-sky-50',
+                  textColor: 'text-sky-700',
+                  borderColor: 'border-sky-200',
+                  shadowColor: 'shadow-sky-500/30',
+                },
+                {
+                  label: 'Hoàn thành Quiz Liên Khương',
+                  icon: PlayCircle,
+                  tag: 'Bài kiểm tra',
+                  gradient: 'from-violet-500 to-purple-600',
+                  bgColor: 'bg-violet-50',
+                  textColor: 'text-violet-700',
+                  borderColor: 'border-violet-200',
+                  shadowColor: 'shadow-violet-500/30',
+                },
+                {
+                  label: 'Đánh dấu ghi chú cá nhân',
+                  icon: CircleCheckBig,
+                  tag: 'Ghi chú',
+                  gradient: 'from-amber-500 to-orange-600',
+                  bgColor: 'bg-amber-50',
+                  textColor: 'text-amber-700',
+                  borderColor: 'border-amber-200',
+                  shadowColor: 'shadow-amber-500/30',
+                },
+                {
+                  label: 'Theo dõi thống kê lớp',
+                  icon: Trophy,
+                  tag: 'Thống kê',
+                  gradient: 'from-emerald-500 to-teal-600',
+                  bgColor: 'bg-emerald-50',
+                  textColor: 'text-emerald-700',
+                  borderColor: 'border-emerald-200',
+                  shadowColor: 'shadow-emerald-500/30',
+                },
+              ].map((item, idx) => (
+                <div
+                  key={item.label}
+                  className={cn(
+                    'group flex items-center justify-between rounded-2xl border bg-white p-4 backdrop-blur-sm transition-all hover:bg-slate-50 hover:shadow-md',
+                    item.borderColor
+                  )}
+                  style={{
+                    animationDelay: `${idx * 100}ms`,
+                    animation: 'fadeIn 0.5s ease-out forwards',
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      'flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition-transform group-hover:scale-110',
+                      item.gradient,
+                      item.shadowColor
+                    )}>
+                      <item.icon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900 leading-snug">
+                        {item.label}
+                      </p>
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">
+                        {item.tag}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={cn(
+                      'text-xs font-semibold transition-all hover:bg-slate-100',
+                      item.textColor
+                    )}
+                    onClick={() => navigate('/lessons')}
+                  >
+                    Bắt đầu
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -1,842 +1,981 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  Button,
-  Chip,
-  Avatar,
-  LinearProgress,
-  TextField,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Tabs,
-  Tab,
-  Paper,
-  IconButton,
-  Rating,
-  Tooltip,
-  Fade,
-  Skeleton,
-  Alert
-} from '@mui/material';
-import {
-  Search,
-  FilterList,
-  School,
-  Schedule,
-  Star,
-  People,
-  PlayArrow,
-  BookmarkBorder,
+  Activity,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUpRight,
+  BadgeCheck,
   Bookmark,
-  TrendingUp,
-  CheckCircle,
-  Lock,
-  EmojiEvents
-} from '@mui/icons-material';
-import axios from 'axios';
-import { resolveAssetUrl } from '../shared/utils/url';
+  BookmarkCheck,
+  BookOpen,
+  Clock,
+  Compass,
+  Layers,
+  Loader2,
+  MapPin,
+  Search,
+  Sparkles,
+  Star,
+  Users,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@features/auth/hooks/useAuth';
-import { listMyBookmarks, addBookmarkApi, removeBookmarkApi, listMyProgress } from '../api/lessonEngagementApi';
+import apiClient from '../shared/services/apiClient';
+import {
+  listMyBookmarks,
+  addBookmarkApi,
+  removeBookmarkApi,
+  listMyProgress,
+} from '../api/lessonEngagementApi';
+import { resolveAssetUrl } from '../shared/utils/url';
+import { LESSON_SECTIONS, SAMPLE_LESSONS } from '../shared/constants/lessonSections';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-
-// Helpers for safe image rendering with graceful fallback
-const isValidImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return false;
-  const u = url.trim();
-  return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/') || u.startsWith('data:');
+const ICON_MAP = {
+  landmarks: MapPin,
+  figures: Sparkles,
+  overview: Layers,
 };
 
-const fallbackSvgDataUri = (text = 'Bài học') => {
-  const label = encodeURIComponent(text);
+const difficultyFilters = ['all', 'Cơ bản', 'Trung bình', 'Nâng cao'];
+const statusFilters = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'in-progress', label: 'Đang học' },
+  { value: 'completed', label: 'Hoàn thành' },
+  { value: 'saved', label: 'Đã lưu' },
+];
+
+const fallbackImage = (label = 'Bài học', theme = 'default') => {
+  const encoded = encodeURIComponent(label);
+  const gradients = {
+    default: { from: '#0ea5e9', to: '#6366f1' },
+    landmarks: { from: '#06b6d4', to: '#3b82f6' },
+    figures: { from: '#8b5cf6', to: '#ec4899' },
+    overview: { from: '#f59e0b', to: '#ef4444' },
+  };
+  const colors = gradients[theme] || gradients.default;
+  
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
-    <svg xmlns='http://www.w3.org/2000/svg' width='800' height='400'>
-      <defs>
-        <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-          <stop offset='0%' stop-color='#2196f3'/>
-          <stop offset='100%' stop-color='#21cbf3'/>
-        </linearGradient>
-      </defs>
-      <rect width='100%' height='100%' fill='url(#g)'/>
-      <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Segoe UI, Arial, sans-serif' font-size='28' fill='white'>${label}</text>
-    </svg>`;
+<svg xmlns='http://www.w3.org/2000/svg' width='960' height='540' viewBox='0 0 960 540'>
+  <defs>
+    <linearGradient id='g-${theme}' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='${colors.from}'/>
+      <stop offset='100%' stop-color='${colors.to}'/>
+    </linearGradient>
+    <filter id='shadow'>
+      <feGaussianBlur in='SourceAlpha' stdDeviation='3'/>
+      <feOffset dx='0' dy='2' result='offsetblur'/>
+      <feComponentTransfer>
+        <feFuncA type='linear' slope='0.2'/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in='SourceGraphic'/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width='960' height='540' fill='url(#g-${theme})' rx='24'/>
+  <text x='50%' y='50%' dy='0.35em' text-anchor='middle' font-family='Inter, -apple-system, system-ui, sans-serif' font-size='48' font-weight='600' fill='white' filter='url(#shadow)'>${encoded}</text>
+</svg>`;
   return `data:image/svg+xml;utf8,${svg}`;
 };
 
-const INITIAL_VISIBLE_LESSONS = 9;
+const parseImages = (raw, fallbackLabel) => {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  if (raw && typeof raw === 'object') return [raw];
+  return [{ url: fallbackImage(fallbackLabel) }];
+};
+
+const buildProgressMap = (rows = []) =>
+  new Map(
+    rows.map((row) => [
+      Number(row.lesson_id),
+      {
+        progress: Number(row.progress ?? 0),
+        isCompleted: Boolean(row.is_completed),
+        bestScore: Number(row.best_score ?? 0),
+      },
+    ]),
+  );
+
+const formatNumber = (value) =>
+  new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Number.isFinite(value) ? value : 0);
+
+const extractMinutes = (lessons = []) =>
+  lessons.reduce((total, lesson) => {
+    const match = String(lesson.duration || '').match(/\d+/);
+    return total + (match ? parseInt(match[0], 10) : 0);
+  }, 0);
+
+const isValidImage = (url) =>
+  typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/') || url.startsWith('data:'));
 
 const Lessons = () => {
   const navigate = useNavigate();
+  const { sectionId } = useParams();
   const { user } = useAuth();
-  const [lessons, setLessons] = useState([]);
-  const [filteredLessons, setFilteredLessons] = useState([]);
-  const [visibleLessons, setVisibleLessons] = useState(INITIAL_VISIBLE_LESSONS);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [tabValue, setTabValue] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [bookmarkedLessons, setBookmarkedLessons] = useState(new Set());
-  const [progressLookup, setProgressLookup] = useState(new Map());
-  const [error, setError] = useState(null);
-  const averageRating = lessons.length
-    ? Math.round((lessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / lessons.length) * 10) / 10
-    : 0;
 
-  // Fetch lessons from API
+  const [lessons, setLessons] = useState([]);
+  const [bookmarked, setBookmarked] = useState(() => new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   useEffect(() => {
-    const fetchLessons = async () => {
+    let active = true;
+
+    const loadData = async () => {
       try {
         setLoading(true);
-        setError(null);
-        console.log('Fetching lessons from:', `${API_BASE_URL}/lessons?published=1`);
-        const response = await axios.get(`${API_BASE_URL}/lessons?published=1`);
-        console.log('API Raw Response:', response.data);
-        const payload = response.data && typeof response.data === 'object'
-          ? (Array.isArray(response.data) ? response.data : response.data.data)
-          : [];
+        setError('');
 
-        if (!Array.isArray(payload)) {
-          console.warn('Unexpected lessons payload type:', typeof payload, payload);
-          setError('Dữ liệu trả về không đúng định dạng (expected array).');
-          setLessons([]);
-          setFilteredLessons([]);
-          setProgressLookup(new Map());
-          return;
-        }
+        const lessonsPromise = apiClient.get('/lessons?published=1');
+        const progressPromise = user ? listMyProgress() : Promise.resolve([]);
+        const bookmarkPromise = user ? listMyBookmarks() : Promise.resolve([]);
 
-        let progressRows = [];
-        const progressMap = new Map();
-        if (user) {
-          try {
-            progressRows = await listMyProgress();
-            progressRows.forEach(row => {
-              const lessonId = Number(row.lesson_id);
-              progressMap.set(lessonId, {
-                progress: Number(row.progress ?? 0),
-                isCompleted: !!row.is_completed,
-                completedAt: row.completed_at || null,
-                bestScore: Number(row.best_score ?? 0)
-              });
-            });
-            setProgressLookup(new Map(progressMap));
-          } catch (err) {
-            console.warn('listMyProgress failed', err);
-            setProgressLookup(new Map());
-          }
-        } else {
-          setProgressLookup(new Map());
-        }
+        const [lessonsRes, progressRows, bookmarkRows] = await Promise.all([
+          lessonsPromise,
+          progressPromise,
+          bookmarkPromise,
+        ]);
 
-        const lessonsFromAPI = payload.map(lesson => {
-          console.log('Processing lesson:', lesson.lesson_id, lesson.title);
+        if (!active) return;
 
-          // Parse images safely and normalize to [{ url, caption }]
-          let parsedImages = [];
-          if (lesson.images) {
-            if (Array.isArray(lesson.images)) {
-              parsedImages = lesson.images;
-            } else if (typeof lesson.images === 'string') {
-              try { parsedImages = JSON.parse(lesson.images); } catch (e) { console.warn('Failed to parse images for lesson', lesson.lesson_id, e); }
-            } else if (typeof lesson.images === 'object') {
-              parsedImages = lesson.images;
+        const payload = Array.isArray(lessonsRes.data)
+          ? lessonsRes.data
+          : Array.isArray(lessonsRes.data?.data)
+            ? lessonsRes.data.data
+            : [];
+
+        const progressMap = buildProgressMap(progressRows);
+        const normalized = (payload || []).map((lesson) => {
+          const lessonId = Number(lesson.lesson_id ?? lesson.id);
+          const progress = progressMap.get(lessonId) || {};
+          const ratingRaw = Number(lesson.avg_rating ?? lesson.rating ?? 0);
+          const ratingCount = Number(lesson.rating_count ?? lesson.ratingCount ?? 0);
+          const rating = ratingCount > 0 && Number.isFinite(ratingRaw) ? Math.round(ratingRaw * 10) / 10 : 0;
+
+          const imageCandidates = parseImages(lesson.images, lesson.title);
+          const firstImage = imageCandidates[0]?.url;
+          let coverImage = fallbackImage(lesson.title);
+          if (typeof firstImage === 'string') {
+            if (firstImage.startsWith('data:')) {
+              coverImage = firstImage;
+            } else {
+              coverImage = resolveAssetUrl(firstImage);
             }
           }
-          if (Array.isArray(parsedImages)) {
-            parsedImages = parsedImages.map(img => (typeof img === 'string' ? { url: img, caption: '' } : img));
-          }
 
-          const avg = parseFloat(lesson.avg_rating ?? lesson.rating ?? 5);
-          const rcount = Number(lesson.rating_count ?? 0);
-          const hasRating = !Number.isNaN(avg) && avg !== null && avg !== undefined;
-          const computedRating = hasRating ? Math.round(avg * 10) / 10 : 5;
-          const progressInfo = progressMap.get(Number(lesson.lesson_id)) || {};
-          const isCompleted = !!progressInfo.isCompleted;
-          const progressPercent = isCompleted ? 100 : Number(progressInfo.progress ?? 0);
-          const bestScore = Number(progressInfo.bestScore ?? 0);
           return {
-            id: lesson.lesson_id,
-            title: lesson.title,
+            id: lessonId,
             slug: lesson.slug,
+            title: lesson.title,
             summary: lesson.summary || '',
-            description: lesson.content_html || '',
-            instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
-            duration: lesson.duration || '25 phút',
+            duration: lesson.duration || '20 phút',
             difficulty: lesson.difficulty || 'Cơ bản',
-            rating: computedRating,
-            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
-            progress: progressPercent,
-            isCompleted,
-            completedAt: progressInfo.completedAt || null,
-            bestScore,
             category: lesson.category || 'Lịch sử địa phương',
-            tags: Array.isArray(lesson.tags) ? lesson.tags : ['Lịch sử'],
-            status: lesson.status || 'Chưa học',
-            images: parsedImages,
-            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString(),
-            ratingCount: rcount
+            rating,
+            ratingCount,
+            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
+            images: imageCandidates,
+            coverImage,
+            instructor: lesson.instructor || 'Ban biên soạn Lịch sử Lâm Đồng',
+            progress: Number(progress.progress ?? 0),
+            isCompleted: Boolean(progress.isCompleted),
+            bestScore: Number(progress.bestScore ?? 0),
+            tags: Array.isArray(lesson.tags) ? lesson.tags : [],
+            isSample: false,
           };
         });
-        console.log('Mapped lessons:', lessonsFromAPI);
-        setLessons(lessonsFromAPI);
-        setFilteredLessons(lessonsFromAPI);
-      } catch (error) {
-        console.error('Error fetching lessons:', error);
-        setError(error.message || 'Không thể tải bài học');
+
+        setLessons(normalized);
+        setBookmarked(new Set((bookmarkRows || []).map((row) => Number(row.lesson_id))));
+      } catch (err) {
+        if (!active) return;
+        const message = err?.response?.data?.error || err?.message || 'Không thể tải danh sách bài học';
+        setError(message);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
-    fetchLessons();
-    // Load bookmarks if logged in
-    (async () => {
-      try {
-        if (!user) return;
-        const items = await listMyBookmarks();
-        const setIds = new Set(items.map(i => i.lesson_id));
-        setBookmarkedLessons(setIds);
-      } catch (e) {
-        // ignore silently
-      }
-    })();
+    loadData();
+
+    return () => {
+      active = false;
+    };
   }, [user]);
 
-  // Filter and search logic
   useEffect(() => {
-    let filtered = [...lessons];
+    setSearchTerm('');
+    setDifficultyFilter('all');
+    setStatusFilter('all');
+  }, [sectionId]);
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(lesson =>
-        lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lesson.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lesson.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
+  const activeSection = useMemo(() => {
+    if (!sectionId) return null;
+    return LESSON_SECTIONS.find((section) => section.id === sectionId) || null;
+  }, [sectionId]);
 
-    // Category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(lesson => lesson.category === selectedCategory);
-    }
+  const overviewSections = useMemo(() =>
+    LESSON_SECTIONS.map((section) => {
+      const source = section.id === 'landmarks' ? lessons : SAMPLE_LESSONS[section.id] || [];
+      const minutes = extractMinutes(source);
+      const rating = source.length
+        ? Math.round((source.reduce((sum, item) => sum + (item.rating || 0), 0) / source.length) * 10) / 10
+        : 0;
+      const learners = source.reduce((sum, item) => sum + (item.studyCount || 0), 0);
+      return {
+        ...section,
+        lessonCount: source.length,
+        minutes,
+        rating,
+        learners,
+      };
+    }),
+  [lessons]);
 
-    // Difficulty filter
-    if (selectedDifficulty !== 'all') {
-      filtered = filtered.filter(lesson => lesson.difficulty === selectedDifficulty);
-    }
+  const sectionLessons = useMemo(() => {
+    if (!activeSection) return [];
+    if (activeSection.id === 'landmarks') return lessons;
+    return (SAMPLE_LESSONS[activeSection.id] || []).map((item) => ({
+      ...item,
+      coverImage: item.coverImage || fallbackImage(item.title),
+      images: Array.isArray(item.images) && item.images.length > 0 ? item.images : [{ url: fallbackImage(item.title) }],
+      progress: Number(item.progress ?? 0),
+      isCompleted: Boolean(item.isCompleted),
+      bestScore: Number(item.bestScore ?? 0),
+      isSample: true,
+    }));
+  }, [activeSection, lessons]);
 
-    // Tab filter
-    switch (tabValue) {
-      case 1: // Đang học
-        filtered = filtered.filter(lesson => lesson.progress > 0 && lesson.progress < 100);
-        break;
-      case 2: // Đã hoàn thành
-        filtered = filtered.filter(lesson => lesson.isCompleted);
-        break;
-      case 3: // Đã lưu
-        filtered = filtered.filter(lesson => bookmarkedLessons.has(lesson.id));
-        break;
-      default: // Tất cả
-        break;
-    }
+  const filteredLessons = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+    return sectionLessons.filter((lesson) => {
+      if (difficultyFilter !== 'all' && lesson.difficulty !== difficultyFilter) {
+        return false;
+      }
 
-    // Sort
-    switch (sortBy) {
-      case 'newest':
-        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        break;
-      case 'oldest':
-        filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        break;
-      case 'rating':
-        filtered.sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
-        break;
-      case 'popular':
-  filtered.sort((a, b) => (b.studyCount || 0) - (a.studyCount || 0));
-        break;
-      case 'duration':
-        filtered.sort((a, b) => {
-          const getDuration = (duration) => parseInt(duration.match(/\d+/)?.[0] || 0);
-          return getDuration(a.duration) - getDuration(b.duration);
-        });
-        break;
-      default:
-        break;
-    }
+      if (activeSection?.id === 'landmarks') {
+        if (statusFilter === 'in-progress' && !(lesson.progress > 0 && !lesson.isCompleted)) return false;
+        if (statusFilter === 'completed' && !lesson.isCompleted) return false;
+        if (statusFilter === 'saved' && !bookmarked.has(Number(lesson.id))) return false;
+      } else if (statusFilter !== 'all') {
+        return false;
+      }
 
-    setFilteredLessons(filtered);
-  }, [lessons, searchTerm, selectedCategory, selectedDifficulty, sortBy, tabValue, bookmarkedLessons]);
+      if (!search) return true;
+      const haystack = [lesson.title, lesson.summary, lesson.category, (lesson.tags || []).join(' ')].join(' ').toLowerCase();
+      return haystack.includes(search);
+    });
+  }, [sectionLessons, searchTerm, difficultyFilter, statusFilter, activeSection, bookmarked]);
 
-  useEffect(() => {
-    setVisibleLessons(INITIAL_VISIBLE_LESSONS);
-  }, [searchTerm, selectedCategory, selectedDifficulty, sortBy, tabValue, lessons.length]);
+  const stats = useMemo(() => {
+    const totalLessons = sectionLessons.length;
+    const totalMinutes = extractMinutes(sectionLessons);
+    const totalLearners = sectionLessons.reduce((sum, lesson) => sum + (lesson.studyCount || 0), 0);
+    const averageRating = sectionLessons.length
+      ? Math.round((sectionLessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / sectionLessons.length) * 10) / 10
+      : 0;
+    return { totalLessons, totalMinutes, totalLearners, averageRating };
+  }, [sectionLessons]);
 
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case 'Cơ bản':
-        return 'success';
-      case 'Trung bình':
-        return 'warning';
-      case 'Nâng cao':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
+  const toggleBookmark = async (lessonId) => {
+    const numericId = Number(lessonId);
+    if (!Number.isFinite(numericId)) return;
+    const isBookmarked = bookmarked.has(numericId);
 
-  const getProgressColor = (progress) => {
-    if (progress === 0) return 'default';
-    if (progress < 100) return 'primary';
-    return 'success';
-  };
+    setBookmarked((prev) => {
+      const next = new Set(prev);
+      if (isBookmarked) {
+        next.delete(numericId);
+      } else {
+        next.add(numericId);
+      }
+      return next;
+    });
 
-  const handleBookmark = async (lessonId, event) => {
-    event.stopPropagation();
-    const newBookmarked = new Set(bookmarkedLessons);
-    const currently = newBookmarked.has(lessonId);
-    // optimistic
-    if (currently) newBookmarked.delete(lessonId); else newBookmarked.add(lessonId);
-    setBookmarkedLessons(newBookmarked);
     try {
-      if (!user) return; // guest: local only
-      if (currently) await removeBookmarkApi(lessonId); else await addBookmarkApi(lessonId);
-    } catch (e) {
-      // revert on error
-      if (currently) newBookmarked.add(lessonId); else newBookmarked.delete(lessonId);
-      setBookmarkedLessons(newBookmarked);
-      setError('Không thể cập nhật danh sách đã lưu');
+      if (!user) return;
+      if (isBookmarked) {
+        await removeBookmarkApi(numericId);
+      } else {
+        await addBookmarkApi(numericId);
+      }
+    } catch (err) {
+      setBookmarked((prev) => {
+        const next = new Set(prev);
+        if (isBookmarked) {
+          next.add(numericId);
+        } else {
+          next.delete(numericId);
+        }
+        return next;
+      });
+      const message = err?.response?.data?.error || err?.message || 'Không thể cập nhật danh sách đã lưu';
+      setError(message);
     }
   };
 
-  const handleLessonClick = (lesson) => {
-    if (user || lesson.id <= 1) { // Allow first lesson for guests
-      navigate(`/lesson/${lesson.slug}`);
-    }
-  };
+  if (!sectionId) {
+    const totalLessons = lessons.length;
+    const totalMinutes = extractMinutes(lessons);
+    const totalLearners = lessons.reduce((sum, lesson) => sum + (lesson.studyCount || 0), 0);
+    const averageRating = lessons.length
+      ? Math.round((lessons.reduce((sum, lesson) => sum + (lesson.rating || 0), 0) / lessons.length) * 10) / 10
+      : 0;
 
-  const categories = [...new Set(lessons.map(lesson => lesson.category))];
-  const difficulties = ['Cơ bản', 'Trung bình', 'Nâng cao'];
-  const displayedLessons = filteredLessons.slice(0, visibleLessons);
-
-  if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box sx={{ mb: 4 }}>
-          <Skeleton variant="text" width="30%" height={60} />
-          <Skeleton variant="text" width="60%" height={30} />
-        </Box>
-        <Grid container spacing={3}>
-          {[...Array(6)].map((_, index) => (
-            <Grid item xs={12} md={6} lg={4} key={index}>
-              <Card>
-                <Skeleton variant="rectangular" height={200} />
-                <CardContent>
-                  <Skeleton variant="text" height={30} />
-                  <Skeleton variant="text" height={20} />
-                  <Skeleton variant="text" height={20} />
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
+      <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 pb-24 pt-16">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -left-40 top-20 h-96 w-96 rounded-full bg-cyan-300/20 blur-[140px]" />
+          <div className="absolute -right-32 top-10 h-[28rem] w-[28rem] rounded-full bg-violet-300/20 blur-[140px]" />
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-white/60 via-transparent to-transparent" />
+        </div>
+
+        <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-4 sm:px-6 lg:px-8">
+          <header className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_450px] lg:items-end">
+            <div className="space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 text-white shadow-xl shadow-slate-900/20 ring-1 ring-white/10">
+                  <BookOpen className="h-6 w-6" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Hành trình học lịch sử</span>
+                  <span className="text-sm font-medium text-slate-400">Lâm Đồng</span>
+                </div>
+              </div>
+              <div className="max-w-3xl space-y-4">
+                <h1 className="text-5xl font-bold leading-tight tracking-tight text-slate-900 sm:text-6xl">
+                  Chọn phần học phù hợp với mục tiêu của bạn
+                </h1>
+                <p className="text-lg leading-relaxed text-slate-600">
+                  Mỗi phần học mở ra một góc nhìn khác nhau về lịch sử Lâm Đồng. Hãy bắt đầu từ chủ đề truyền cảm hứng nhất với bạn.
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[{
+                label: 'Bài học hiện có',
+                value: formatNumber(totalLessons),
+                icon: Layers,
+                gradient: 'from-sky-500 to-blue-600',
+                bg: 'bg-sky-50',
+                text: 'text-sky-700',
+              }, {
+                label: 'Tổng thời lượng',
+                value: `${formatNumber(totalMinutes)} phút`,
+                icon: Clock,
+                gradient: 'from-emerald-500 to-teal-600',
+                bg: 'bg-emerald-50',
+                text: 'text-emerald-700',
+              }, {
+                label: 'Lượt học',
+                value: formatNumber(totalLearners),
+                icon: Users,
+                gradient: 'from-amber-500 to-orange-600',
+                bg: 'bg-amber-50',
+                text: 'text-amber-700',
+              }, {
+                label: 'Đánh giá trung bình',
+                value: averageRating ? `${averageRating}/5` : '—',
+                icon: Star,
+                gradient: 'from-violet-500 to-purple-600',
+                bg: 'bg-violet-50',
+                text: 'text-violet-700',
+              }].map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <Card key={stat.label} className="group border-0 bg-white/80 shadow-lg shadow-slate-200/50 backdrop-blur-xl transition-all hover:shadow-xl hover:shadow-slate-300/50">
+                    <CardContent className="flex items-center gap-4 p-6">
+                      <div className={cn('flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg transition-transform group-hover:scale-110', stat.gradient, stat.text)}>
+                        <Icon className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
+                        <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </header>
+
+          {error && (
+            <Card className="border-l-4 border-l-rose-500 border-y-0 border-r-0 bg-gradient-to-r from-rose-50 to-rose-50/50 shadow-sm">
+              <CardContent className="flex items-center gap-4 p-5 text-sm text-rose-800">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                  <Activity className="h-5 w-5 text-rose-600" />
+                </div>
+                <span className="flex-1 font-medium">{error}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-rose-600 hover:bg-rose-100 hover:text-rose-700"
+                  onClick={() => setError('')}
+                >
+                  Đóng
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <section className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
+            {overviewSections.map((section) => {
+              const Icon = ICON_MAP[section.id] || Layers;
+              const badgeText = section.comingSoon ? 'Sắp ra mắt' : `${section.lessonCount} bài học`;
+              const gradient = section.accent ? `bg-gradient-to-br ${section.accent}` : 'bg-gradient-to-br from-slate-600 to-slate-800';
+
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => navigate(`/lessons/${section.id}`)}
+                  className="group relative flex min-h-[28rem] flex-col overflow-hidden rounded-[2rem] border-0 bg-white p-10 text-left shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/50 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-slate-300/60 hover:ring-slate-300/70 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                >
+                  {/* Gradient overlay on hover */}
+                  <div className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" aria-hidden="true">
+                    <div className={cn('absolute inset-x-4 top-4 h-56 rounded-[1.75rem] blur-3xl', gradient, 'opacity-20')} />
+                  </div>
+
+                  <div className="relative flex items-start justify-between">
+                    <span className={cn('flex h-16 w-16 items-center justify-center rounded-[1.25rem] text-white shadow-2xl ring-1 ring-white/20 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3', gradient)}>
+                      <Icon className="h-7 w-7" />
+                    </span>
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        'px-4 py-1.5 text-xs font-bold uppercase tracking-wider',
+                        section.comingSoon 
+                          ? 'border-amber-300 bg-gradient-to-r from-amber-50 to-amber-100 text-amber-800 shadow-sm shadow-amber-200' 
+                          : 'border-slate-300 bg-white text-slate-700 shadow-sm'
+                      )}
+                    >
+                      {badgeText}
+                    </Badge>
+                  </div>
+
+                  <div className="relative mt-8 space-y-5">
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400">{section.shortTitle}</p>
+                      <h2 className="h-16 text-2xl font-bold leading-tight text-slate-900 transition-colors group-hover:text-slate-800 line-clamp-2">
+                        {section.title}
+                      </h2>
+                    </div>
+                    <p className="h-[4.5rem] text-sm leading-relaxed text-slate-600 line-clamp-3">{section.description}</p>
+                  </div>
+
+                  <div className="relative mt-8 grid grid-cols-3 gap-4">
+                    <StatsPill label="Bài học" value={formatNumber(section.lessonCount)} />
+                    <StatsPill label="Thời lượng" value={`${formatNumber(section.minutes)}'`} />
+                    <StatsPill label="Đánh giá" value={section.rating ? `${section.rating}/5` : '—'} />
+                  </div>
+
+                  {/* Spacer to push footer to bottom */}
+                  <div className="flex-1" />
+
+                  <div className="relative mt-10 flex items-center justify-between text-sm font-semibold">
+                    <span className="text-slate-700 transition-colors group-hover:text-slate-900">
+                      {section.comingSoon ? 'Đang hoàn thiện nội dung' : 'Bắt đầu khám phá ngay'}
+                    </span>
+                    <ArrowUpRight className="h-5 w-5 text-slate-400 transition-all duration-300 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-slate-600" />
+                  </div>
+                </button>
+              );
+            })}
+          </section>
+
+          {loading && <LoadingState />}
+        </div>
+      </div>
     );
   }
 
-  return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Error Alert */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Header */}
-      <Box sx={{ mb: 4, textAlign: 'center' }}>
-        <Typography variant="h3" component="h1" gutterBottom sx={{
-          fontWeight: 'bold',
-          background: 'linear-gradient(135deg, #1976d2, #2196f3)',
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
-        }}>
-          Bài học về Lâm Đồng
-        </Typography>
-        <Typography variant="h6" color="text.secondary" paragraph>
-          Khám phá kiến thức về lịch sử, văn hóa và địa lý của tỉnh Lâm Đồng
-        </Typography>
-      </Box>
-
-      {/* Search and Filters */}
-      <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              placeholder="Tìm kiếm bài học..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2
-                }
-              }}
-            />
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2}>
-            <FormControl fullWidth>
-              <InputLabel>Danh mục</InputLabel>
-              <Select
-                value={selectedCategory}
-                label="Danh mục"
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <MenuItem value="all">Tất cả</MenuItem>
-                {categories.map(category => (
-                  <MenuItem key={category} value={category}>{category}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} sm={6} md={2}>
-            <FormControl fullWidth>
-              <InputLabel>Độ khó</InputLabel>
-              <Select
-                value={selectedDifficulty}
-                label="Độ khó"
-                onChange={(e) => setSelectedDifficulty(e.target.value)}
-              >
-                <MenuItem value="all">Tất cả</MenuItem>
-                {difficulties.map(difficulty => (
-                  <MenuItem key={difficulty} value={difficulty}>{difficulty}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <FormControl fullWidth>
-              <InputLabel>Sắp xếp</InputLabel>
-              <Select
-                value={sortBy}
-                label="Sắp xếp"
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <MenuItem value="newest">Mới nhất</MenuItem>
-                <MenuItem value="oldest">Cũ nhất</MenuItem>
-                <MenuItem value="rating">Đánh giá cao</MenuItem>
-                <MenuItem value="popular">Phổ biến</MenuItem>
-                <MenuItem value="duration">Thời lượng</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={2}>
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<FilterList />}
-              onClick={() => {
-                setSearchTerm('');
-                setSelectedCategory('all');
-                setSelectedDifficulty('all');
-                setSortBy('newest');
-              }}
-            >
-              Xóa bộ lọc
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      {/* Tabs */}
-      <Paper elevation={1} sx={{ mb: 4, borderRadius: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
-          variant="fullWidth"
-          sx={{
-            '& .MuiTab-root': {
-              fontWeight: 'medium',
-              fontSize: '1rem'
-            }
-          }}
+  if (!activeSection) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-20 text-center">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 to-slate-300 shadow-xl">
+          <Layers className="h-12 w-12 text-slate-500" />
+        </div>
+        <div className="mt-8 max-w-md space-y-3">
+          <h2 className="text-3xl font-bold text-slate-800">Phần học chưa khả dụng</h2>
+          <p className="text-base leading-relaxed text-slate-600">
+            Vui lòng quay lại danh sách phần học và chọn một chủ đề khác. Chúng tôi sẽ cập nhật nội dung mới ngay khi hoàn thiện.
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="lg"
+          className="mt-8 rounded-full px-8" 
+          onClick={() => navigate('/lessons')}
         >
-          <Tab label={`Tất cả (${lessons.length})`} />
-          <Tab label={`Đang học (${lessons.filter(l => l.progress > 0 && l.progress < 100).length})`} />
-          <Tab label={`Hoàn thành (${lessons.filter(l => l.isCompleted).length})`} />
-          <Tab label={`Đã lưu (${bookmarkedLessons.size})`} />
-        </Tabs>
-      </Paper>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Trở về danh sách phần học
+        </Button>
+      </div>
+    );
+  }
 
-      {/* Lessons Grid */}
-      {filteredLessons.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3 }}>
-          <Typography variant="h6" color="text.secondary">
-            Không tìm thấy bài học nào phù hợp
-          </Typography>
+  const Icon = ICON_MAP[activeSection.id] || Layers;
+  const gradient = activeSection.accent ? `bg-gradient-to-br ${activeSection.accent}` : 'bg-gradient-to-br from-slate-600 to-slate-800';
+  const showStatusFilters = activeSection.id === 'landmarks';
+  const showBookmarks = activeSection.id === 'landmarks';
+
+  return (
+    <div className="relative min-h-screen bg-gradient-to-br from-white via-blue-50/20 to-slate-50 pb-24 pt-12">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-48 top-16 h-[30rem] w-[30rem] rounded-full bg-cyan-300/20 blur-[150px]" />
+        <div className="absolute -right-40 top-24 h-[32rem] w-[32rem] rounded-full bg-violet-300/20 blur-[150px]" />
+        <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-white/80 via-transparent to-transparent" />
+      </div>
+
+      <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 sm:px-6 lg:px-8">
+        {/* Header Section */}
+        <header className="space-y-8">
+          {/* Back Button */}
           <Button
-            variant="contained"
-            sx={{ mt: 2 }}
-            onClick={() => {
-              setSearchTerm('');
-              setSelectedCategory('all');
-              setSelectedDifficulty('all');
-              setTabValue(0);
-            }}
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/lessons')}
+            className="group inline-flex h-11 items-center gap-2 rounded-full border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 shadow-md transition-all hover:border-slate-400 hover:bg-slate-50 hover:shadow-lg"
           >
-            Xem tất cả bài học
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+            Trở về danh sách
           </Button>
-        </Paper>
-      ) : (
-        <Grid container spacing={3}>
-          {displayedLessons.map((lesson, index) => {
-            const isLocked = !user && lesson.id > 1;
-            const isBookmarked = bookmarkedLessons.has(lesson.id);
 
+          {/* Title & Description */}
+          <div className="max-w-4xl space-y-4">
+            <h1 className="text-5xl font-bold leading-tight tracking-tight text-slate-900 sm:text-6xl">
+              {activeSection.heroTitle}
+            </h1>
+            <p className="text-lg leading-relaxed text-slate-600">
+              {activeSection.heroDescription}
+            </p>
+          </div>
+
+        </header>
+
+        {/* Search & Filters Section */}
+        <div className="mx-auto w-full max-w-6xl space-y-0 rounded-2xl bg-white/80 px-8 py-6 shadow-lg backdrop-blur-sm">
+          {/* Filter Bar - Centered and Wide */}
+          <div className="flex items-center justify-center gap-6 border-b border-slate-200 pb-6">
+            {/* Search Box */}
+            <div className="relative w-80">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm bài học..."
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              />
+            </div>
+
+            {/* Danh mục */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-slate-600">Danh mục:</label>
+              <select
+                value={difficultyFilter}
+                onChange={(e) => setDifficultyFilter(e.target.value)}
+                className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              >
+                <option value="all">Tất cả</option>
+                {difficultyFilters.filter(f => f !== 'all').map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Độ khó */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-slate-600">Độ khó:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              >
+                {statusFilters.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sắp xếp */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-slate-600">Sắp xếp:</label>
+              <select className="h-11 min-w-[140px] cursor-pointer rounded-xl border border-slate-300 bg-white px-4 pr-10 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200">
+                <option>Mới nhất</option>
+                <option>Cũ nhất</option>
+                <option>Phổ biến nhất</option>
+              </select>
+            </div>
+
+            {/* Clear Button */}
+            {(searchTerm || difficultyFilter !== 'all' || statusFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDifficultyFilter('all');
+                  setStatusFilter('all');
+                }}
+                className="flex h-11 items-center gap-2 rounded-xl border border-sky-300 bg-white px-5 text-sm font-medium text-sky-600 transition-colors hover:bg-sky-50"
+              >
+                <span className="text-lg">✕</span>
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+
+          {/* Status Tabs - Centered */}
+          <div className="flex items-center justify-center gap-2 pt-4">
+            {[
+              { label: 'TẤT CẢ', count: filteredLessons.length, value: 'all' },
+              { label: 'ĐANG HỌC', count: 3, value: 'learning' },
+              { label: 'HOÀN THÀNH', count: 1, value: 'completed' },
+              { label: 'ĐÃ LƯU', count: 2, value: 'saved' },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setStatusFilter(tab.value)}
+                className={cn(
+                  'relative px-8 py-3 text-sm font-semibold transition-all',
+                  statusFilter === tab.value
+                    ? 'text-sky-600'
+                    : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                {tab.label} ({tab.count})
+                {statusFilter === tab.value && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full bg-sky-600" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <Card className="border-l-4 border-l-rose-500 border-y-0 border-r-0 bg-gradient-to-r from-rose-50 to-rose-50/50 shadow-sm">
+            <CardContent className="flex items-center gap-4 p-5 text-sm text-rose-800">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100">
+                <Activity className="h-5 w-5 text-rose-600" />
+              </div>
+              <span className="flex-1 font-medium">{error}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-rose-600 hover:bg-rose-100 hover:text-rose-700"
+                onClick={() => setError('')}
+              >
+                Đóng
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {loading ? (
+          <LoadingState />
+        ) : filteredLessons.length === 0 ? (
+          <Card className="border-2 border-dashed border-slate-300 bg-slate-50/50 shadow-sm">
+            <CardContent className="flex flex-col items-center gap-5 py-20 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
+                <Compass className="h-10 w-10 text-slate-400" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-lg font-bold text-slate-700">Không tìm thấy bài học phù hợp</p>
+                <p className="text-sm text-slate-500">Thử điều chỉnh bộ lọc hoặc tìm kiếm với từ khóa khác</p>
+              </div>
+              <Button
+                variant="outline"
+                size="lg"
+                className="mt-2"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDifficultyFilter('all');
+                  setStatusFilter('all');
+                }}
+              >
+                Đặt lại bộ lọc
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-7 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredLessons.map((lesson) => (
+              <LessonCard
+                key={lesson.id}
+                lesson={lesson}
+                onOpen={() => lesson.slug && navigate(`/lesson/${lesson.slug}`)}
+                showBookmark={showBookmarks}
+                bookmarked={bookmarked.has(Number(lesson.id))}
+                onBookmarkToggle={showBookmarks ? () => toggleBookmark(lesson.id) : undefined}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Stats Section - Bottom Centered */}
+        <div className="mx-auto mt-12 flex max-w-5xl items-center justify-center gap-8 rounded-3xl bg-gradient-to-br from-white/95 to-slate-50/95 p-10 shadow-2xl shadow-slate-300/50 backdrop-blur-sm">
+          {[
+            { label: 'BÀI HỌC', value: formatNumber(stats.totalLessons), icon: Layers, gradient: 'from-sky-500 to-blue-600' },
+            { label: 'THỜI LƯỢNG', value: `${formatNumber(stats.totalMinutes)} phút`, icon: Clock, gradient: 'from-emerald-500 to-teal-600' },
+            { label: 'LƯỢT HỌC', value: formatNumber(stats.totalLearners), icon: Users, gradient: 'from-amber-500 to-orange-600' },
+            { 
+              label: 'ĐÁNH GIÁ', 
+              value: stats.totalLessons > 0 && stats.totalRating > 0 
+                ? `${(stats.totalRating / stats.totalLessons).toFixed(1)}/5` 
+                : '0.0/5', 
+              icon: Star, 
+              gradient: 'from-violet-500 to-purple-600' 
+            },
+          ].map((stat) => {
+            const StatIcon = stat.icon;
             return (
-              <Grid item xs={12} md={6} lg={4} key={lesson.id}>
-                <Fade in={true} timeout={300 + index * 100}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: isLocked ? 'not-allowed' : 'pointer',
-                      position: 'relative',
-                      // Use a fixed, smaller radius for a cleaner look (was 3 -> 3 * theme.shape.borderRadius)
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      transition: 'all 0.3s ease',
-                      opacity: isLocked ? 0.7 : 1,
-                      '&:hover': {
-                        transform: isLocked ? 'none' : 'translateY(-8px)',
-                        boxShadow: isLocked ? 'none' : '0 12px 40px rgba(0,0,0,0.15)'
-                      }
-                    }}
-                    onClick={() => handleLessonClick(lesson)}
-                  >
-                    {/* Lock Overlay */}
-                    {isLocked && (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          background: 'rgba(0,0,0,0.3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 2
-                        }}
-                      >
-                        <Box sx={{ textAlign: 'center', color: 'white' }}>
-                          <Lock sx={{ fontSize: 48, mb: 1 }} />
-                          <Typography variant="h6" fontWeight="bold">
-                            Cần đăng nhập
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* Progress Indicator */}
-                    {lesson.progress > 0 && (
-                      <LinearProgress
-                        variant="determinate"
-                        value={lesson.progress}
-                        color={getProgressColor(lesson.progress)}
-                        sx={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          zIndex: 1,
-                          height: 4
-                        }}
-                      />
-                    )}
-
-                    {/* Image area */}
-                    <Box sx={{ position: 'relative', height: 200, overflow: 'hidden' }}>
-                      {(() => {
-                        const raw = lesson?.images?.[0]?.url || '';
-                        const resolved = resolveAssetUrl(raw);
-                        const ok = isValidImageUrl(resolved);
-                        return ok ? (
-                          <Box
-                            component="img"
-                            src={resolved}
-                            alt={lesson.title}
-                            loading="lazy"
-                            onError={(e) => {
-                              // Avoid infinite loop in case fallback fails
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = fallbackSvgDataUri(lesson.category || 'Bài học');
-                            }}
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          />
-                        ) : (
-                          <Box sx={{
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: `linear-gradient(135deg, ${lesson.id % 3 === 0 ? '#ff6b6b, #ee5a52' : lesson.id % 3 === 1 ? '#4ecdc4, #44a08d' : '#45b7d1, #96c93d'})`
-                          }}>
-                            <Typography
-                              variant="h5"
-                              sx={{
-                                color: 'white',
-                                fontWeight: 'bold',
-                                textAlign: 'center',
-                                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                                px: 2
-                              }}
-                            >
-                              {lesson.category}
-                            </Typography>
-                          </Box>
-                        );
-                      })()}
-
-                      {/* Bookmark Button */}
-                      <IconButton
-                        onClick={(e) => handleBookmark(lesson.id, e)}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          bgcolor: 'rgba(255,255,255,0.9)',
-                          '&:hover': { bgcolor: 'rgba(255,255,255,1)' }
-                        }}
-                      >
-                        {isBookmarked ? (<Bookmark sx={{ color: 'primary.main' }} />) : (<BookmarkBorder />)}
-                      </IconButton>
-
-                      {/* Completion Badge */}
-                      {lesson.isCompleted && (
-                        <Tooltip title={`Điểm cao nhất: ${lesson.bestScore ?? 0}%`} placement="right">
-                          <Chip
-                            icon={<CheckCircle />}
-                            label="Hoàn thành"
-                            color="success"
-                            sx={{ position: 'absolute', top: 8, left: 8, fontWeight: 'bold' }}
-                          />
-                        </Tooltip>
-                      )}
-                    </Box>
-
-                    <CardContent sx={{ flexGrow: 1, p: 3, display: 'flex', flexDirection: 'column' }}>
-                      <Typography variant="h6" component="h2" gutterBottom sx={{
-                        fontWeight: 'bold',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical'
-                      }}>
-                        {lesson.title}
-                      </Typography>
-
-                      <Typography variant="body2" color="text.secondary" paragraph sx={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical'
-                      }}>
-                        {lesson.summary}
-                      </Typography>
-
-                      {/* Meta Info */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Schedule fontSize="small" color="action" />
-                          <Typography variant="caption">{lesson.duration}</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <People fontSize="small" color="action" />
-                          <Typography variant="caption">{lesson.studyCount} lượt học</Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Star fontSize="small" sx={{ color: '#ffb400' }} />
-                          <Typography variant="caption">{lesson.rating ?? 5}</Typography>
-                        </Box>
-                        {lesson.isCompleted && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <EmojiEvents fontSize="small" color="success" />
-                            <Typography variant="caption">{lesson.bestScore ?? 0}%</Typography>
-                          </Box>
-                        )}
-                      </Box>
-
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Chip
-                          label={lesson.difficulty}
-                          color={getDifficultyColor(lesson.difficulty)}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
-                            <School fontSize="small" />
-                          </Avatar>
-                          <Typography variant="caption" color="text.secondary">
-                            {lesson.instructor.split(' ').slice(-2).join(' ')}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      {/* Tags */}
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
-                        {lesson.tags.slice(0, 3).map((tag, index) => (
-                          <Chip
-                            key={index}
-                            label={tag}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem' }}
-                          />
-                        ))}
-                        {lesson.tags.length > 3 && (
-                          <Tooltip title={lesson.tags.slice(3).join(', ')}>
-                            <Chip
-                              label={`+${lesson.tags.length - 3}`}
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem' }}
-                            />
-                          </Tooltip>
-                        )}
-                      </Box>
-
-                      {/* Spacer pushes the button to the bottom while content above can grow */}
-                      <Box sx={{ flexGrow: 1 }} />
-
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        startIcon={<PlayArrow />}
-                        disabled={isLocked}
-                        sx={{
-                          borderRadius: 2,
-                          background: isLocked ? 'grey.400' : 'linear-gradient(135deg, #2196f3, #21cbf3)',
-                          '&:hover': {
-                            background: isLocked ? 'grey.400' : 'linear-gradient(135deg, #1976d2, #1e88e5)'
-                          }
-                        }}
-                      >
-                        {isLocked ? 'Cần đăng nhập' : 'Bắt đầu học'}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Fade>
-              </Grid>
+              <div key={stat.label} className="flex items-center gap-5">
+                <div className={cn('flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg', stat.gradient)}>
+                  <StatIcon className="h-7 w-7 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{stat.label}</span>
+                  <span className="text-2xl font-bold text-slate-900">{stat.value}</span>
+                </div>
+              </div>
             );
           })}
-        </Grid>
-      )}
-
-      {filteredLessons.length > INITIAL_VISIBLE_LESSONS && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          {visibleLessons < filteredLessons.length ? (
-            <Button
-              variant="outlined"
-              onClick={() =>
-                setVisibleLessons((prev) => Math.min(prev + INITIAL_VISIBLE_LESSONS, filteredLessons.length))
-              }
-            >
-              Xem thêm ({filteredLessons.length - visibleLessons})
-            </Button>
-          ) : (
-            <Button variant="outlined" onClick={() => setVisibleLessons(INITIAL_VISIBLE_LESSONS)}>
-              Thu gọn
-            </Button>
-          )}
-        </Box>
-      )}
-
-      {/* Statistics */}
-      <Paper elevation={2} sx={{ mt: 6, p: 4, borderRadius: 3, textAlign: 'center' }}>
-        <Typography variant="h6" gutterBottom>
-          Thống kê bài học
-        </Typography>
-        <Grid container spacing={3} sx={{ mt: 2 }}>
-          <Grid item xs={12} sm={3}>
-            <Box>
-              <Typography variant="h4" color="primary.main" fontWeight="bold">
-                {lessons.length}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Tổng bài học
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Box>
-              <Typography variant="h4" color="success.main" fontWeight="bold">
-                {
-                  // Sum total minutes across lessons by parsing the duration strings
-                  lessons.reduce((sum, lesson) => {
-                    const match = String(lesson.duration).match(/\d+/);
-                    const minutes = match ? parseInt(match[0], 10) : 0;
-                    return sum + minutes;
-                  }, 0)
-                }
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Tổng thời lượng (phút)
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Box>
-              <Typography variant="h4" color="warning.main" fontWeight="bold">
-                {averageRating}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Đánh giá trung bình
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={3}>
-            <Box>
-              <Typography variant="h4" color="info.main" fontWeight="bold">
-                {lessons.reduce((sum, lesson) => sum + (lesson.studyCount || 0), 0)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Tổng lượt học
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
 };
+
+const LessonCard = ({ lesson, onOpen, showBookmark, bookmarked, onBookmarkToggle }) => {
+  const isCompleted = lesson.isCompleted;
+  const inProgress = !isCompleted && lesson.progress > 0;
+  const rawCover = lesson.coverImage || lesson.images?.[0]?.url;
+  let imageSrc = fallbackImage(lesson.title || 'Bài học', 'default');
+  if (typeof rawCover === 'string') {
+    if (rawCover.startsWith('data:')) {
+      imageSrc = rawCover;
+    } else if (isValidImage(rawCover) && rawCover.startsWith('/')) {
+      imageSrc = resolveAssetUrl(rawCover);
+    } else if (rawCover.startsWith('http')) {
+      imageSrc = rawCover;
+    } else if (!rawCover.startsWith('http')) {
+      imageSrc = resolveAssetUrl(rawCover);
+    }
+  }
+
+  return (
+    <article
+      role={lesson.slug ? 'button' : 'article'}
+      tabIndex={lesson.slug ? 0 : undefined}
+      onClick={() => lesson.slug && onOpen?.()}
+      onKeyDown={(event) => {
+        if (!lesson.slug) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen?.();
+        }
+      }}
+      className={cn(
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-lg transition-all duration-300',
+        lesson.slug ? 'cursor-pointer hover:shadow-xl' : 'cursor-default',
+      )}
+    >
+      {/* Image Section - Fixed Height */}
+      <div className="relative h-48 w-full shrink-0 overflow-hidden">
+        <img
+          src={imageSrc}
+          alt={lesson.title}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = fallbackImage(lesson.title, 'default');
+          }}
+        />
+        
+        {/* Status Badge - Top Left */}
+        <div className="absolute left-4 top-4">
+          <span
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide shadow-md',
+              isCompleted
+                ? 'bg-emerald-500 text-white'
+                : inProgress
+                  ? 'bg-sky-500 text-white'
+                  : 'bg-white text-slate-700',
+            )}
+          >
+            {isCompleted ? 'Đang học' : inProgress ? 'Đang học' : 'Mới'}
+          </span>
+        </div>
+
+        {/* Bookmark Button - Top Right */}
+        {showBookmark && onBookmarkToggle && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onBookmarkToggle();
+            }}
+            className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/95 text-slate-700 shadow-md backdrop-blur-sm transition-all hover:bg-white"
+          >
+            {bookmarked ? (
+              <BookmarkCheck className="h-4 w-4 fill-sky-600 text-sky-600" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+          </button>
+        )}
+
+        {/* Progress Bar at Bottom of Image */}
+        {!lesson.isSample && lesson.progress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-200">
+            <div 
+              className="h-full bg-gradient-to-r from-sky-500 to-blue-600" 
+              style={{ width: `${Math.min(Math.max(lesson.progress, 2), 100)}%` }} 
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Content Section - Flex with fixed structure */}
+      <div className="flex flex-1 flex-col p-6">
+        {/* Title - Fixed 2 lines */}
+        <h3 className="mb-3 h-14 text-lg font-bold leading-tight text-slate-900 line-clamp-2">
+          {lesson.title}
+        </h3>
+
+        {/* Description - Fixed 3 lines max */}
+        <p className="mb-4 h-[4.5rem] text-sm leading-relaxed text-slate-600 line-clamp-3">
+          {lesson.summary}
+        </p>
+
+        {/* Stats Row - Fixed height */}
+        <div className="mb-4 flex h-5 items-center gap-4 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            {lesson.duration}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3.5 w-3.5" />
+            {formatNumber(lesson.studyCount || 0)}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+            <span className="font-semibold text-slate-700">{lesson.rating || '—'}</span>
+          </span>
+        </div>
+
+        {/* Tags - Fixed height and structure */}
+        <div className="mb-4 flex h-7 flex-wrap gap-2">
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+            {lesson.difficulty}
+          </span>
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+            {lesson.category}
+          </span>
+          {(lesson.tags || []).slice(0, 1).map((tag) => (
+            <span key={tag} className="rounded-lg bg-slate-50 px-3 py-1 text-xs text-slate-600">
+              #{tag}
+            </span>
+          ))}
+          {(lesson.tags || []).length > 1 && (
+            <span className="rounded-lg bg-slate-50 px-2.5 py-1 text-xs text-slate-500">
+              +{lesson.tags.length - 1}
+            </span>
+          )}
+        </div>
+
+        {/* Spacer to push footer to bottom */}
+        <div className="flex-1" />
+
+        {/* Footer - Fixed height and position at bottom */}
+        <div className="flex h-16 items-center justify-between border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100">
+              <Sparkles className="h-4 w-4 text-slate-600" />
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-xs font-semibold text-slate-800 line-clamp-1">{lesson.instructor}</span>
+              <span className="text-xs text-slate-500">Giảng viên</span>
+            </div>
+          </div>
+
+          {lesson.slug ? (
+            <Button 
+              size="sm" 
+              className="h-9 shrink-0 rounded-full bg-sky-500 px-5 text-xs font-bold text-white shadow-md transition-all hover:bg-sky-600 hover:shadow-lg"
+            >
+              {inProgress ? 'Tiếp tục' : isCompleted ? 'Ôn tập' : 'Bắt đầu'}
+              <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          ) : (
+            <span className="text-xs font-medium text-slate-400">Sắp ra mắt</span>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+};
+
+const StatsPill = ({ label, value }) => (
+  <div className="group flex min-h-[6rem] flex-col items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 px-4 py-5 text-center shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+    <p className="flex items-baseline justify-center text-2xl font-bold leading-none text-slate-800 transition-colors group-hover:text-slate-900">{value}</p>
+  </div>
+);
+
+const LoadingState = () => (
+  <div className="grid gap-7 sm:grid-cols-2 xl:grid-cols-3">
+    {Array.from({ length: 6 }).map((_, index) => (
+      <div
+        key={index}
+        className="flex h-full animate-pulse flex-col gap-5 overflow-hidden rounded-[2rem] border-0 bg-white p-0 shadow-xl shadow-slate-200/60 ring-1 ring-slate-200/50"
+      >
+        <div className="h-52 w-full bg-gradient-to-br from-slate-200 to-slate-300" />
+        <div className="space-y-4 px-7 pb-7">
+          <div className="space-y-3">
+            <div className="h-3 w-1/3 rounded-full bg-slate-200" />
+            <div className="h-5 w-5/6 rounded-full bg-slate-300" />
+            <div className="h-3 w-full rounded-full bg-slate-200" />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <div className="h-5 w-20 rounded-full bg-slate-200" />
+            <div className="h-5 w-16 rounded-full bg-slate-200" />
+            <div className="h-5 w-14 rounded-full bg-slate-200" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-7 w-24 rounded-full bg-slate-200" />
+            <div className="h-7 w-32 rounded-full bg-slate-200" />
+          </div>
+          <div className="mt-6 flex items-center justify-between">
+            <div className="h-10 w-32 rounded-full bg-slate-200" />
+            <div className="flex h-10 w-10 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 export default Lessons;

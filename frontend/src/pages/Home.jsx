@@ -152,7 +152,7 @@ const Home = () => {
                     variant="contained"
                     size="large"
                     startIcon={<School />}
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/my-learning')}
                     sx={{
                       background: 'linear-gradient(135deg, #4caf50, #66bb6a)',
                       color: 'white',

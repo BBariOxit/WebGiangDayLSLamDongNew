@@ -4,7 +4,7 @@ import { useAuth } from '../../features/auth/hooks/useAuth';
 
 // Import pages
 import Home from '../../pages/Home';
-import Dashboard from '../../pages/Dashboard';
+import MyLearning from '../../pages/MyLearning';
 import Lessons from '../../pages/Lessons';
 import LessonDetail from '../../pages/LessonDetail';
 // Legacy Quiz page kept for lesson-tied quizzes; new quiz hub below
@@ -116,20 +116,21 @@ const AppRoutes = () => {
       <Route path="/" element={<Home />} />
       <Route path="/lesson/:slug" element={<LessonDetail />} />
       
-      {/* Auth routes - redirect to dashboard if already logged in */}
+      {/* Auth routes - redirect to my-learning if already logged in */}
       <Route 
         path="/login" 
-        element={user ? <Navigate to="/dashboard" replace /> : <Login />} 
+        element={user ? <Navigate to="/my-learning" replace /> : <Login />} 
       />
       <Route 
         path="/register" 
-        element={user ? <Navigate to="/dashboard" replace /> : <Register />} 
+        element={user ? <Navigate to="/my-learning" replace /> : <Register />} 
       />
       
       {/* Routes with AppLayout */}
       <Route element={<AppLayout />}>
-        {/* Public route with layout */}
-        <Route path="/lessons" element={<Lessons />} />
+  {/* Public route with layout */}
+  <Route path="/lessons" element={<Lessons />} />
+  <Route path="/lessons/:sectionId" element={<Lessons />} />
         
         {/* Quizzes hub (requires auth) */}
         <Route 
@@ -203,10 +204,10 @@ const AppRoutes = () => {
         
         {/* Protected routes with layout */}
         <Route 
-          path="/dashboard" 
+          path="/my-learning" 
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <MyLearning />
             </ProtectedRoute>
           } 
         />
