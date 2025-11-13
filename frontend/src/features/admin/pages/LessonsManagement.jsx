@@ -826,7 +826,7 @@ const LessonsManagement = () => {
                     <td className="px-8 py-6">
                       <p className="text-base font-semibold text-slate-900">{lesson.title}</p>
                       {lesson.summary && (
-                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500 line-clamp-2 whitespace-pre-line break-words break-all">
                           {lesson.summary}
                         </p>
                       )}

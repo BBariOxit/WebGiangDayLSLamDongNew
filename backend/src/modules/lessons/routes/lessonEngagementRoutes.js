@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { verifyAccess } from '../../../middlewares/authMiddleware.js';
-import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl, recordStudySessionCtrl, listProgressCtrl } from '../controllers/lessonEngagementController.js';
+import { listCommentsCtrl, createCommentCtrl, deleteCommentCtrl, saveProgressCtrl, getProgressCtrl, ratingSummaryCtrl, quizBundleCtrl, submitQuizAttemptCtrl, listAttemptsCtrl, addBookmarkCtrl, removeBookmarkCtrl, listBookmarksCtrl, recordStudySessionCtrl, listProgressCtrl, learningPathOverviewCtrl, myLearningProgressCtrl } from '../controllers/lessonEngagementController.js';
 
 const router = Router();
 
 // User aggregates
 router.get('/me/progress', verifyAccess, listProgressCtrl);
+router.get('/me/learning-path', verifyAccess, learningPathOverviewCtrl);
 router.get('/me/bookmarks', verifyAccess, listBookmarksCtrl);
+router.get('/my-learning-progress', verifyAccess, myLearningProgressCtrl);
 
 // Comments
 router.get('/:lessonId/comments', listCommentsCtrl);

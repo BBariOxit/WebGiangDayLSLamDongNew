@@ -72,3 +72,8 @@ export async function removeBookmarkApi(lessonId){
   const res = await apiClient.delete(`/lessons/${lessonId}/bookmark`);
   return res.data?.data || null;
 }
+
+export async function fetchLearningPathOverview() {
+  const res = await apiClient.get('/lessons/me/learning-path');
+  return res.data?.data || null;
+}

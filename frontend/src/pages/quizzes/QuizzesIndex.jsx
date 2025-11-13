@@ -240,7 +240,7 @@ const QuizzesIndex = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 px-6">
       <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 p-6 text-white shadow-smooth">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_45%)] opacity-70" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center">

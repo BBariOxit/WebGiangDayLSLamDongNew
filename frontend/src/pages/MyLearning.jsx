@@ -8,6 +8,8 @@ import {
   Clock,
   Filter,
   Flame,
+  Layers,
+  MapPin,
   MoreVertical,
   Play,
   Search,
@@ -26,7 +28,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { listMyProgress } from '../api/lessonEngagementApi';
 
 const DEFAULT_RATING = 5;
 
@@ -65,28 +66,12 @@ const formatRating = (value) => {
   return Math.round(numeric * 10) / 10;
 };
 
-const buildProgressMap = (rows = []) =>
-  new Map(
-    rows
-      .map((row) => {
-        const lessonId = Number(row.lesson_id);
-        if (!Number.isFinite(lessonId)) return null;
-        return [
-          lessonId,
-          {
-            progress: Number(row.progress ?? 0),
-            isCompleted: Boolean(row.is_completed ?? row.isCompleted),
-          },
-        ];
-      })
-      .filter(Boolean),
-  );
-
 const MyLearning = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const [lessons, setLessons] = useState([]);
+  const [learningStats, setLearningStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,47 +85,27 @@ const MyLearning = () => {
         setLoading(true);
         setError('');
 
-        const lessonsPromise = apiClient.get('/lessons?published=1');
-        const progressPromise = user ? listMyProgress() : Promise.resolve([]);
+        if (!user) {
+          if (mounted) {
+            setLessons([]);
+            setLearningStats(null);
+            setLoading(false);
+          }
+          return;
+        }
 
-        const [lessonsRes, progressRows] = await Promise.all([lessonsPromise, progressPromise]);
+        // Gọi API lấy thống kê học tập
+        const statsRes = await apiClient.get('/lessons/my-learning-progress');
+        const stats = statsRes?.data?.data;
 
         if (!mounted) return;
 
-        const payload = Array.isArray(lessonsRes.data)
-          ? lessonsRes.data
-          : lessonsRes.data?.data || [];
+        if (!stats) {
+          throw new Error('Dữ liệu lộ trình học không hợp lệ');
+        }
 
-        const progressMap = buildProgressMap(progressRows);
-
-        const normalized = (payload || []).map((lesson) => {
-          const lessonId = Number(lesson.lesson_id ?? lesson.id);
-          const progressState = progressMap.get(lessonId) || {};
-          const progressValue = clampProgress(progressState.progress ?? lesson.progress ?? 0);
-          const isCompleted = progressState.isCompleted || progressValue >= 100;
-
-          const ratingSource = lesson.avg_rating ?? lesson.rating ?? lesson.avgRating;
-
-          return {
-            id: lessonId,
-            slug: lesson.slug,
-            title: lesson.title,
-            summary: lesson.summary || '',
-            instructor: lesson.instructor || 'Nhóm biên soạn địa phương',
-            duration: lesson.duration || '25 phút',
-            difficulty: lesson.difficulty || 'Cơ bản',
-            category: lesson.category || 'Lịch sử địa phương',
-            rating: formatRating(ratingSource),
-            ratingCount: Number(lesson.rating_count ?? lesson.ratingCount ?? 0),
-            studyCount: Number(lesson.study_sessions_count ?? lesson.students_count ?? 0),
-            progress: progressValue,
-            status: isCompleted ? 'completed' : progressValue > 0 ? 'in-progress' : 'not-started',
-            images: parseLessonImages(lesson.images),
-            createdAt: lesson.created_at || lesson.createdAt || new Date().toISOString(),
-          };
-        });
-
-        setLessons(normalized);
+        setLearningStats(stats);
+        setLessons(Array.isArray(stats.lessonProgress) ? stats.lessonProgress : []);
       } catch (err) {
         if (mounted) {
           const message = err?.response?.data?.error || err?.message || 'Không thể tải dữ liệu bài học';
@@ -159,11 +124,13 @@ const MyLearning = () => {
 
   // Filter lessons based on search and status
   const filteredLessons = useMemo(() => {
+    if (!lessons || !Array.isArray(lessons)) return [];
+    
     let filtered = lessons;
 
     // Filter by status
     if (filterStatus !== 'all') {
-      filtered = filtered.filter((lesson) => lesson.status === filterStatus);
+      filtered = filtered.filter((lesson) => lesson && lesson.status === filterStatus);
     }
 
     // Filter by search query
@@ -171,9 +138,10 @@ const MyLearning = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (lesson) =>
-          lesson.title.toLowerCase().includes(query) ||
-          lesson.category.toLowerCase().includes(query) ||
-          lesson.summary.toLowerCase().includes(query)
+          lesson &&
+          (lesson.title?.toLowerCase().includes(query) ||
+          lesson.category?.toLowerCase().includes(query) ||
+          lesson.summary?.toLowerCase().includes(query))
       );
     }
 
@@ -182,21 +150,30 @@ const MyLearning = () => {
 
   // Stats
   const stats = useMemo(() => {
-    const inProgress = lessons.filter((l) => l.status === 'in-progress').length;
-    const completed = lessons.filter((l) => l.status === 'completed').length;
-    const totalProgress = lessons.length > 0 ? Math.round((completed / lessons.length) * 100) : 0;
-    const recentProgress = lessons
-      .filter((l) => l.status === 'in-progress')
-      .reduce((sum, l) => sum + l.progress, 0) / Math.max(inProgress, 1);
+    if (!learningStats || !learningStats.overview) {
+      return {
+        inProgress: 0,
+        completed: 0,
+        totalProgress: 0,
+        total: 0,
+        quizCompletion: 0,
+        completedSections: 0,
+        totalSections: 1
+      };
+    }
 
+    const overview = learningStats.overview;
+    
     return {
-      inProgress,
-      completed,
-      totalProgress,
-      recentProgress: Math.round(recentProgress),
-      total: lessons.length,
+      inProgress: Number(overview.inProgressLessons) || 0,
+      completed: Number(overview.completedLessons) || 0,
+      totalProgress: Number(overview.lessonCompletionPercent) || 0,
+      total: Number(overview.totalLessons) || 0,
+      quizCompletion: Number(overview.quizCompletionPercent) || 0,
+      completedSections: Number(overview.completedSections) || 0,
+      totalSections: Math.max(Number(overview.totalSections) || 1, 1)
     };
-  }, [lessons]);
+  }, [learningStats]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 pb-20 pt-8">
@@ -229,55 +206,41 @@ const MyLearning = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
-                label: 'Bài đang học',
-                value: stats.inProgress.toString(),
-                icon: Play,
-                gradient: 'from-sky-500 to-blue-600',
-                shadow: 'shadow-sky-500/30',
-              },
-              {
-                label: 'Bài hoàn thành',
-                value: stats.completed.toString(),
+                label: 'BÀI HỌC HOÀN THÀNH',
+                value: `${stats.completed}/${stats.total}`,
                 icon: CheckCircle2,
-                gradient: 'from-emerald-500 to-teal-600',
-                shadow: 'shadow-emerald-500/30',
+                gradient: 'from-blue-500 to-blue-600',
               },
               {
-                label: 'Tiến độ tổng',
-                value: `${stats.totalProgress}%`,
+                label: 'ĐANG HỌC',
+                value: stats.inProgress.toString(),
                 icon: TrendingUp,
-                gradient: 'from-amber-500 to-orange-600',
-                shadow: 'shadow-amber-500/30',
+                gradient: 'from-purple-500 to-purple-600',
               },
               {
-                label: 'Tiến độ hiện tại',
-                value: `${stats.recentProgress}%`,
-                icon: Zap,
-                gradient: 'from-violet-500 to-purple-600',
-                shadow: 'shadow-violet-500/30',
+                label: 'HOÀN THÀNH PHẦN HỌC',
+                value: `${stats.completedSections}/${stats.totalSections}`,
+                icon: Layers,
+                gradient: 'from-emerald-500 to-teal-600',
+              },
+              {
+                label: 'QUIZ ĐÃ VƯỢT QUA',
+                value: `${stats.quizCompletion}%`,
+                icon: Target,
+                gradient: 'from-rose-500 to-pink-600',
               },
             ].map((stat) => (
               <Card
                 key={stat.label}
-                className="group border-2 border-slate-300 bg-white/80 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-slate-400 hover:shadow-xl"
+                className="group overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl"
               >
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        {stat.label}
-                      </p>
-                      <p className="mt-2 text-3xl font-bold text-slate-900">
-                        {stat.value}
-                      </p>
-                    </div>
-                    <div className={cn(
-                      'flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg',
-                      stat.gradient,
-                      stat.shadow
-                    )}>
-                      <stat.icon className="h-5 w-5 text-white" />
-                    </div>
+                <CardContent className={cn('flex items-center gap-4 bg-gradient-to-br p-6', stat.gradient)}>
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm transition-transform group-hover:scale-110">
+                    <stat.icon className="h-7 w-7 text-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/80">{stat.label}</p>
+                    <p className="text-3xl font-bold text-white">{stat.value}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -285,56 +248,138 @@ const MyLearning = () => {
           </div>
         </div>
 
+        {/* Tiến độ từng phần */}
+        <div className="mb-8">
+          <div className="mb-4 flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900">PHẦN HỌC</h2>
+            <span className="text-sm text-slate-500">Tiến độ từng phần</span>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {(!learningStats || !learningStats.sectionProgress || learningStats.sectionProgress.length === 0) ? (
+              <div className="col-span-3 py-8 text-center text-slate-500">
+                Chưa có dữ liệu phần học
+              </div>
+            ) : (
+              learningStats.sectionProgress.map((section, index) => {
+              const iconMap = {
+                'landmarks': MapPin,
+                'figures': Sparkles,
+                'overview': Layers
+              };
+              const gradientMap = {
+                'landmarks': 'from-cyan-500 to-blue-600',
+                'figures': 'from-purple-500 to-pink-600',
+                'overview': 'from-orange-500 to-red-600'
+              };
+              const SectionIcon = iconMap[section.id] || Layers;
+              const gradient = gradientMap[section.id] || 'from-slate-500 to-slate-600';
+              const isComingSoon = section.totalLessons === 0 || (!section.highlightLesson);
+
+              return (
+                <Card
+                  key={section.id}
+                  className="group overflow-hidden border-2 border-slate-200 bg-white transition-all hover:border-slate-300 hover:shadow-lg"
+                >
+                  <CardContent className="p-6">
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className={cn('flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br shadow-lg', gradient)}>
+                        <SectionIcon className="h-7 w-7 text-white" />
+                      </div>
+                      {isComingSoon && (
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                          SẮP RA MẮT
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Phần học</p>
+                        <h3 className="mt-1 text-lg font-bold text-slate-900">{section.title}</h3>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-end justify-between">
+                          <span className="text-3xl font-bold text-slate-900">{section.progressPercent}%</span>
+                          <span className="text-sm text-slate-600">{section.completedLessons}/{section.totalLessons} bài học</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className={cn('h-full bg-gradient-to-r transition-all', gradient)}
+                            style={{ width: `${section.progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-100 pt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">GỢI Ý TIẾP THEO</p>
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                          {section.highlightLesson?.title || 'Chưa bắt đầu'}
+                        </p>
+                        {section.highlightLesson && (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                            <span>{section.highlightLesson.progressPercent}% • {section.highlightLesson.status === 'completed' ? 'Hoàn thành' : section.highlightLesson.status === 'in-progress' ? 'Đang học' : 'Chưa học'}</span>
+                          </div>
+                        )}
+                      </div>
+                      {!isComingSoon && section.highlightLesson && (
+                        <Button
+                          size="sm"
+                          className="w-full rounded-lg bg-slate-900 hover:bg-slate-800"
+                          onClick={() => navigate(`/lesson/${section.highlightLesson.slug}`)}
+                        >
+                          {section.highlightLesson.status === 'in-progress' ? 'Tiếp tục' : 'Bắt đầu'}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+            )}
+          </div>
+        </div>
+
         {/* Search and Filter */}
         <div className="mb-8 flex flex-col gap-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Tìm kiếm bài học..."
+                placeholder="Tìm bài học..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-2xl border-2 border-slate-300 bg-white py-3 pl-11 pr-4 text-slate-900 placeholder-slate-400 transition-all focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                className="w-full rounded-xl border-2 border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder-slate-400 transition-all focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-100"
               />
             </div>
-            <Tabs
-              value={filterStatus}
-              onValueChange={setFilterStatus}
-              className="w-full sm:w-auto"
-            >
-              <TabsList className="grid w-full grid-cols-4 bg-slate-100 sm:w-auto">
-                <TabsTrigger 
-                  value="all"
-                  className="text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm"
+            <div className="flex gap-2">
+              {[
+                { value: 'all', label: 'Tất cả', color: 'slate' },
+                { value: 'in-progress', label: 'Đang học', color: 'purple' },
+                { value: 'completed', label: 'Hoàn thành', color: 'blue' },
+                { value: 'not-started', label: 'Mới', color: 'slate' },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setFilterStatus(tab.value)}
+                  className={cn(
+                    'rounded-xl px-5 py-2.5 text-sm font-semibold transition-all',
+                    filterStatus === tab.value
+                      ? tab.color === 'purple'
+                        ? 'bg-purple-100 text-purple-700 shadow-sm'
+                        : tab.color === 'blue'
+                          ? 'bg-blue-100 text-blue-700 shadow-sm'
+                          : 'bg-slate-900 text-white shadow-md'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  )}
                 >
-                  Tất cả
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="in-progress"
-                  className="text-xs data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-sm"
-                >
-                  Đang học
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="completed"
-                  className="text-xs data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
-                >
-                  Hoàn thành
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="not-started"
-                  className="text-xs data-[state=active]:bg-slate-100 data-[state=active]:shadow-sm"
-                >
-                  Mới
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {error && (
-          <Card className="mb-8 border-2 border-rose-300 bg-rose-50">
+          <Card className="mb-8 border border-rose-300 bg-rose-50">
             <CardContent className="py-4">
               <p className="text-sm font-medium text-rose-700">{error}</p>
             </CardContent>
@@ -347,7 +392,7 @@ const MyLearning = () => {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse space-y-3 rounded-2xl border-2 border-slate-300 bg-white p-4"
+                className="animate-pulse space-y-3 rounded-2xl border border-slate-200 bg-white p-4"
               >
                 <div className="h-40 rounded-xl bg-slate-200" />
                 <div className="h-4 w-3/4 rounded bg-slate-200" />
@@ -393,143 +438,133 @@ const MyLearning = () => {
 };
 
 const LessonCard = ({ lesson, index, onOpen }) => {
-  const backgroundImage = lesson.images?.[0]?.url
-    ? `linear-gradient(135deg, rgba(15,23,42,0.85), rgba(30,41,59,0.75)), url('${resolveAssetUrl(
-        lesson.images[0].url,
-      )}')`
-    : 'linear-gradient(135deg, rgba(99,102,241,0.9), rgba(139,92,246,0.85))';
+  const firstImage = lesson.images?.[0]?.url || lesson.coverImage;
+  const coverImage = firstImage ? (firstImage.startsWith('data:') ? firstImage : resolveAssetUrl(firstImage)) : null;
 
   const statusConfig = {
     'in-progress': {
       label: 'Đang học',
-      icon: Play,
-      color: 'from-sky-500 to-blue-600',
-      textColor: 'text-sky-700',
-      bgColor: 'bg-sky-50',
+      badgeClass: 'bg-slate-900 text-white',
     },
     completed: {
       label: 'Hoàn thành',
-      icon: CheckCircle2,
-      color: 'from-emerald-500 to-teal-600',
-      textColor: 'text-emerald-700',
-      bgColor: 'bg-emerald-50',
+      badgeClass: 'bg-white/90 text-slate-900 border border-slate-200',
     },
     'not-started': {
       label: 'Mới',
-      icon: Sparkles,
-      color: 'from-amber-500 to-orange-600',
-      textColor: 'text-amber-700',
-      bgColor: 'bg-amber-50',
+      badgeClass: 'bg-white/90 text-slate-900 border border-slate-200',
     },
   };
 
-  const config = statusConfig[lesson.status];
-  const StatusIcon = config.icon;
+  const config = statusConfig[lesson.status] || statusConfig['not-started'];
+  const progress = Number(lesson.progressPercent || lesson.progress || 0);
+  const rating = Number(lesson.averageRating || lesson.rating || 5);
+  const studyCount = Number(lesson.studyCount || lesson.studySessions || 0);
+
+  // Đảm bảo progress hợp lệ
+  const validProgress = Number.isFinite(progress) ? Math.min(Math.max(progress, 0), 100) : 0;
 
   return (
     <button
       onClick={onOpen}
-      className="group relative overflow-hidden rounded-2xl border-2 border-slate-300 bg-white transition-all duration-300 hover:-translate-y-2 hover:border-slate-400 hover:shadow-2xl"
-      style={{
-        animationDelay: `${index * 50}ms`,
-        animation: 'fadeIn 0.5s ease-out forwards',
-      }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border-2 border-slate-200 bg-white text-left transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl"
     >
-      {/* Image section */}
-      <div
-        className="relative h-40 w-full overflow-hidden bg-cover bg-center"
-        style={{
-          backgroundImage,
-        }}
-      >
+      {/* Image section with overlay */}
+      <div className="relative h-52 w-full overflow-hidden bg-slate-900">
+        {coverImage ? (
+          <img
+            src={coverImage}
+            alt={lesson.title}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900">
+            <BookOpen className="h-16 w-16 text-slate-500" />
+          </div>
+        )}
+        
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
+        
         {/* Status Badge */}
         <div className="absolute right-3 top-3">
-          <Badge className={cn(
-            'flex items-center gap-1.5 border-0 text-white shadow-lg',
-            config.color
-          )}>
-            <StatusIcon className="h-3.5 w-3.5" />
+          <Badge className={cn('shadow-lg', config.badgeClass)}>
             {config.label}
           </Badge>
         </div>
 
-        {/* Progress overlay */}
-        {lesson.status !== 'not-started' && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-300/20">
+        {/* Progress bar at bottom */}
+        {lesson.status !== 'not-started' && validProgress > 0 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-800/50">
             <div
-              className="h-full bg-gradient-to-r from-sky-400 via-indigo-400 to-violet-500 transition-all duration-500"
-              style={{ width: `${lesson.progress}%` }}
+              className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 transition-all"
+              style={{ width: `${validProgress}%` }}
             />
           </div>
         )}
       </div>
 
       {/* Content section */}
-      <div className="flex flex-col gap-3 p-4">
-        <div>
-          <h3 className="line-clamp-2 text-left text-base font-bold text-slate-900 group-hover:text-sky-600 transition-colors">
-            {lesson.title}
-          </h3>
-          <p className="mt-1 line-clamp-2 text-left text-xs text-slate-500">
-            {lesson.summary}
-          </p>
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        {/* Title */}
+        <h3 className="line-clamp-2 text-base font-bold leading-snug text-slate-900">
+          {lesson.title}
+        </h3>
+
+        {/* Description */}
+        <p className="line-clamp-2 text-sm leading-relaxed text-slate-600">
+          {lesson.summary || 'Cùng tìm hiểu về lịch sử lâm đồng'}
+        </p>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="rounded-lg border-slate-200 bg-slate-50 text-xs font-medium text-slate-700">
+            {lesson.difficulty || 'Cơ bản'}
+          </Badge>
+          <Badge variant="outline" className="rounded-lg border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+            {lesson.category || 'Lịch sử địa phương'}
+          </Badge>
         </div>
 
-        {/* Meta info */}
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="border-slate-200 text-xs text-slate-600 bg-slate-50">
-            {lesson.difficulty}
-          </Badge>
-          <Badge variant="outline" className="border-slate-200 text-xs text-slate-600 bg-slate-50">
-            {lesson.category}
-          </Badge>
-        </div>
+        {/* Spacer */}
+        <div className="flex-1" />
 
         {/* Footer */}
-        <div className="flex items-end justify-between border-t border-slate-100 pt-3">
-          <div className="flex flex-col gap-1 text-left">
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <Clock className="h-3 w-3" />
-              {lesson.duration}
+        <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          <div className="flex gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              {lesson.duration || '25 phút'}
             </div>
-            <div className="flex items-center gap-1 text-xs text-slate-500">
-              <Users className="h-3 w-3" />
-              {lesson.studyCount} lượt học
+            <div className="flex items-center gap-1">
+              <Users className="h-3.5 w-3.5" />
+              {studyCount}
             </div>
           </div>
-          
-          <div className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5">
-            {lesson.rating >= 4 && <Flame className="h-3.5 w-3.5 text-amber-500" />}
-            <span className="text-xs font-semibold text-slate-700">{lesson.rating}/5</span>
+          <div className="flex items-center gap-1">
+            <Flame className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-bold text-slate-900">{rating}/5</span>
           </div>
         </div>
 
-        {/* Progress bar for in-progress lessons */}
-        {lesson.status === 'in-progress' && (
-          <div className="pt-2">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-600">Tiến độ</span>
-              <span className="font-semibold text-slate-900">{lesson.progress}%</span>
+        {/* Progress indicator for in-progress */}
+        {lesson.status === 'in-progress' && validProgress > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-600">Tiến độ</span>
+              <span className="font-bold text-slate-900">{Math.round(validProgress)}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full bg-gradient-to-r from-sky-400 via-indigo-400 to-violet-500 transition-all duration-500"
-                style={{ width: `${lesson.progress}%` }}
+                className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600"
+                style={{ width: `${validProgress}%` }}
               />
             </div>
           </div>
         )}
-      </div>
-
-      {/* CTA Button */}
-      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-300 group-hover:bg-black/30">
-        <Button
-          size="lg"
-          className="bg-white text-slate-900 opacity-0 transition-all duration-300 group-hover:opacity-100 hover:bg-slate-50"
-        >
-          <ArrowUpRight className="mr-2 h-4 w-4" />
-          {lesson.status === 'completed' ? 'Ôn tập' : lesson.status === 'in-progress' ? 'Tiếp tục' : 'Bắt đầu'}
-        </Button>
       </div>
     </button>
   );

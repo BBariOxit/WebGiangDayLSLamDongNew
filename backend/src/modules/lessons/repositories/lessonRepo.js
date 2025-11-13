@@ -115,6 +115,33 @@ export async function listLessons({ q, publishedOnly, limit = 20, offset = 0 }) 
   return r.rows;
 }
 
+export async function listPublishedLessonsBasic() {
+  const r = await query(`
+    SELECT lesson_id, title, slug, summary, duration, difficulty, category, tags, images, study_sessions_count
+    FROM lessons
+    WHERE is_published = true
+    ORDER BY lesson_id ASC
+  `);
+  return r.rows.map((row) => {
+    let images = [];
+    if (Array.isArray(row.images)) {
+      images = row.images;
+    } else if (typeof row.images === 'string') {
+      try {
+        images = JSON.parse(row.images);
+      } catch {
+        images = [];
+      }
+    }
+    return {
+      ...row,
+      lesson_id: Number(row.lesson_id),
+      tags: Array.isArray(row.tags) ? row.tags : [],
+      images
+    };
+  });
+}
+
 export async function updateLesson(id, data) {
   const { title, contentHtml, summary, isPublished, instructor, duration, difficulty, category, tags, images, sections } = data;
   

@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { ok, fail } from '../../../utils/response.js';
-import { addCommentSvc, listCommentsSvc, deleteCommentSvc, saveProgressSvc, getProgressSvc, getRatingSummarySvc, getQuizBundleSvc, submitQuizAttemptSvc, listAttemptsSvc, addBookmarkSvc, removeBookmarkSvc, listBookmarksSvc, recordStudySessionSvc, listProgressForUserSvc } from '../services/lessonEngagementService.js';
+import { addCommentSvc, listCommentsSvc, deleteCommentSvc, saveProgressSvc, getProgressSvc, getRatingSummarySvc, getQuizBundleSvc, submitQuizAttemptSvc, listAttemptsSvc, addBookmarkSvc, removeBookmarkSvc, listBookmarksSvc, recordStudySessionSvc, listProgressForUserSvc, learningPathOverviewSvc } from '../services/lessonEngagementService.js';
 
 const commentSchema = Joi.object({ content: Joi.string().min(1).required(), rating: Joi.number().integer().min(1).max(5).optional() });
 const progressSchema = Joi.object({ progress: Joi.number().integer().min(0).max(100).required() });
@@ -22,6 +22,24 @@ export async function removeBookmarkCtrl(req,res){ try { ok(res, await removeBoo
 export async function listBookmarksCtrl(req,res){ try { ok(res, await listBookmarksSvc(req.user)); } catch(e){ fail(res,401,e.message);} }
 
 export async function listProgressCtrl(req,res){ try { ok(res, await listProgressForUserSvc(req.user)); } catch(e){ fail(res,401,e.message);} }
+
+export async function learningPathOverviewCtrl(req, res) {
+  try {
+    ok(res, await learningPathOverviewSvc(req.user));
+  } catch (e) {
+    const status = e.message === 'Unauthorized' ? 401 : 400;
+    fail(res, status, e.message);
+  }
+}
+
+export async function myLearningProgressCtrl(req, res) {
+  try {
+    ok(res, await learningPathOverviewSvc(req.user));
+  } catch (e) {
+    const status = e.message === 'Unauthorized' ? 401 : 400;
+    fail(res, status, e.message);
+  }
+}
 
 export async function recordStudySessionCtrl(req, res) {
 	try {

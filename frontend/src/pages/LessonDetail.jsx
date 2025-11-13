@@ -432,7 +432,11 @@ const LessonDetail = () => {
           <CardHeader className="flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-3">
               <CardTitle className="text-3xl font-semibold text-slate-900 sm:text-4xl">{lesson.title}</CardTitle>
-              {lesson.summary && <p className="text-base leading-relaxed text-slate-600">{lesson.summary}</p>}
+              {lesson.summary && (
+                <p className="text-base leading-relaxed text-slate-600 whitespace-pre-line break-words break-all">
+                  {lesson.summary}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {lesson.tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="rounded-full bg-slate-100 text-slate-600">
