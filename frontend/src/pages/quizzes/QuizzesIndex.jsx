@@ -250,8 +250,7 @@ const QuizzesIndex = () => {
               Quiz & Bài tập tương tác dành cho bạn
             </h1>
             <p className="max-w-3xl text-base text-white/80">
-              Chọn ngay một bài quiz để luyện tập kiến thức Lịch sử Lâm Đồng. Giao diện mới sử dụng Tailwind + shadcn/ui
-              giúp trải nghiệm thống nhất với hệ thống.
+              Chọn ngay một bài quiz để luyện tập kiến thức Lịch sử Lâm Đồng.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button
